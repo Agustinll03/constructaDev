@@ -1,0 +1,64 @@
+from datetime import date, datetime
+from pydantic import BaseModel, Field, model_validator
+from app.models.task import TaskStatus
+
+
+class TaskCreate(BaseModel):
+    obra_id: int
+    title: str = Field(..., min_length=2, max_length=255)
+    description: str | None = None
+    responsible_id: int | None = None
+    start_date: date | None = None
+    due_date: date | None = None
+    order_index: int = Field(default=0, ge=0)
+    depends_on_id: int | None = None
+
+    @model_validator(mode="after")
+    def due_after_start(self) -> "TaskCreate":
+        if self.start_date and self.due_date and self.due_date < self.start_date:
+            raise ValueError("due_date must be after start_date")
+        return self
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = Field(None, min_length=2, max_length=255)
+    description: str | None = None
+    responsible_id: int | None = None
+    start_date: date | None = None
+    due_date: date | None = None
+    order_index: int | None = Field(None, ge=0)
+    depends_on_id: int | None = None
+
+    @model_validator(mode="after")
+    def due_after_start(self) -> "TaskUpdate":
+        if self.start_date and self.due_date and self.due_date < self.start_date:
+            raise ValueError("due_date must be after start_date")
+        return self
+
+
+class TaskRead(BaseModel):
+    id: int
+    obra_id: int
+    title: str
+    description: str | None
+    status: TaskStatus
+    responsible_id: int | None
+    estimated_progress: int
+    start_date: date | None
+    due_date: date | None
+    completed_date: date | None
+    order_index: int
+    depends_on_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TaskStatusUpdate(BaseModel):
+    """Used by the AI pipeline (Phase 2) — not a public HTTP endpoint."""
+    status: TaskStatus
+    estimated_progress: int = Field(..., ge=0, le=100)
+    completed_date: date | None = None
+    triggered_by: str = "system"
+    reason: str | None = None

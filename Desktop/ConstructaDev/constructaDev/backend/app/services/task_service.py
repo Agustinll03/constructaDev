@@ -1,0 +1,334 @@
+from datetime import date
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.exceptions import ForbiddenError, NotFoundError, UnprocessableError
+from app.models.alert import AlertType
+from app.models.task import Task, TaskStatus
+from app.repositories.alert import AlertRepository
+from app.repositories.historial import HistorialRepository
+from app.repositories.obra import ObraRepository
+from app.repositories.responsible import ResponsibleRepository
+from app.repositories.task import TaskRepository
+from app.schemas.task import TaskCreate, TaskStatusUpdate, TaskUpdate
+
+_FIELD_LABELS: dict[str, str] = {
+    "title":          "título",
+    "description":    "descripción",
+    "responsible_id": "responsable",
+    "start_date":     "fecha de inicio",
+    "due_date":       "fecha de vencimiento",
+    "order_index":    "orden",
+    "depends_on_id":  "dependencia",
+}
+
+
+def _to_json(v: object) -> object:
+    return str(v) if isinstance(v, date) else v
+
+
+_NULL_LABELS: dict[str, str] = {
+    "start_date":         "Sin fecha",
+    "due_date":           "Sin fecha",
+    "description":        "Sin descripción",
+    "estimated_progress": "Sin definir",
+    "depends_on_id":      "Sin dependencia",
+    "order_index":        "—",
+}
+
+
+def _format_field_value(field: str, value: object) -> str:
+    if value is None:
+        return _NULL_LABELS.get(field, "—")
+    if field in ("start_date", "due_date"):
+        s = str(value)
+        if len(s) == 10 and s[4] == "-":
+            y, m, d_part = s.split("-")
+            return f"{d_part}/{m}/{y}"
+        return s
+    if field == "description":
+        s = str(value)
+        return s if s else "Sin descripción"
+    if field == "estimated_progress":
+        return f"{value}%"
+    if field == "depends_on_id":
+        return f"Tarea #{value}"
+    return str(value)
+
+
+# Task state is controlled by the system, not by users.
+# These are the only allowed transitions.
+VALID_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
+    TaskStatus.PENDIENTE:   {TaskStatus.EN_PROGRESO, TaskStatus.CANCELADA},
+    TaskStatus.EN_PROGRESO: {TaskStatus.BLOQUEADA, TaskStatus.EN_REVISION, TaskStatus.CANCELADA},
+    TaskStatus.BLOQUEADA:   {TaskStatus.EN_PROGRESO, TaskStatus.CANCELADA},
+    TaskStatus.EN_REVISION: {TaskStatus.EN_PROGRESO, TaskStatus.COMPLETADA, TaskStatus.CANCELADA},
+    TaskStatus.COMPLETADA:  set(),
+    TaskStatus.CANCELADA:   set(),
+}
+
+
+class TaskService:
+    def __init__(self, session: AsyncSession) -> None:
+        self.repo = TaskRepository(session)
+        self.obra_repo = ObraRepository(session)
+        self.resp_repo = ResponsibleRepository(session)
+        self.historial = HistorialRepository(session)
+        self.alert_repo = AlertRepository(session)
+
+    # ── guards ────────────────────────────────────────────────────────────────
+
+    async def _get_obra_and_assert_access(self, obra_id: int, manager_id: int) -> None:
+        obra = await self.obra_repo.get(obra_id)
+        if not obra:
+            raise NotFoundError("Obra", obra_id)
+        if obra.manager_id != manager_id:
+            raise ForbiddenError()
+
+    async def _assert_responsible_active(self, responsible_id: int) -> None:
+        """Block assignment of inactive responsibles.
+
+        In Phase 2 the chatbot sends messages to the responsible's phone.
+        An inactive responsible means they left the project — assigning them
+        would cause silent failures when the webhook tries to contact them.
+        """
+        responsible = await self.resp_repo.get(responsible_id)
+        if not responsible:
+            raise NotFoundError("Responsible", responsible_id)
+        if not responsible.is_active:
+            raise UnprocessableError(
+                f"Responsible {responsible_id} is inactive and cannot be assigned to tasks"
+            )
+
+    async def _assert_depends_on_valid(
+        self, depends_on_id: int, obra_id: int, current_task_id: int | None = None
+    ) -> None:
+        """Ensure the referenced dependency task belongs to the same obra.
+
+        Cross-obra dependencies are logically invalid and would corrupt
+        Gantt chain resolution in Phase 3.
+        Also blocks self-reference (a task depending on itself).
+        """
+        if current_task_id is not None and depends_on_id == current_task_id:
+            raise UnprocessableError("A task cannot depend on itself")
+
+        dep_task = await self.repo.get(depends_on_id)
+        if not dep_task:
+            raise NotFoundError("Task", depends_on_id)
+        if dep_task.obra_id != obra_id:
+            raise UnprocessableError(
+                f"Task {depends_on_id} belongs to a different obra and cannot be a dependency"
+            )
+
+    # ── public methods ────────────────────────────────────────────────────────
+
+    async def create(self, data: TaskCreate, manager_id: int) -> Task:
+        await self._get_obra_and_assert_access(data.obra_id, manager_id)
+
+        if data.responsible_id is not None:
+            await self._assert_responsible_active(data.responsible_id)
+
+        if data.depends_on_id is not None:
+            await self._assert_depends_on_valid(data.depends_on_id, data.obra_id)
+
+        task = Task(**data.model_dump())
+        task = await self.repo.create(task)
+        await self.historial.log(
+            obra_id=task.obra_id,
+            task_id=task.id,
+            event_type="task_created",
+            description=f"Task '{task.title}' created",
+            triggered_by="user",
+        )
+        return task
+
+    async def get_or_raise(self, task_id: int) -> Task:
+        task = await self.repo.get(task_id)
+        if not task:
+            raise NotFoundError("Task", task_id)
+        return task
+
+    async def get_for_manager(self, task_id: int, manager_id: int) -> Task:
+        task = await self.get_or_raise(task_id)
+        await self._get_obra_and_assert_access(task.obra_id, manager_id)
+        return task
+
+    async def list_by_obra(self, obra_id: int, manager_id: int) -> list[Task]:
+        await self._get_obra_and_assert_access(obra_id, manager_id)
+        return await self.repo.list_by_obra(obra_id)
+
+    async def _responsible_label(self, rid: object) -> str:
+        if rid is None:
+            return "Sin responsable"
+        resp = await self.resp_repo.get(int(rid))  # type: ignore[arg-type]
+        return resp.full_name if resp else f"Responsable #{rid}"
+
+    async def _enrich_all_entries(
+        self, real_changes: dict[str, dict[str, object]]
+    ) -> None:
+        for field, entry in real_changes.items():
+            if field == "responsible_id":
+                entry["from_label"] = await self._responsible_label(entry["from"])
+                entry["to_label"]   = await self._responsible_label(entry["to"])
+            else:
+                entry["from_label"] = _format_field_value(field, entry["from"])
+                entry["to_label"]   = _format_field_value(field, entry["to"])
+
+    async def _resolve_update_alerts(
+        self, task_id: int, changes: dict[str, object]
+    ) -> None:
+        if changes.get("responsible_id") is not None:
+            await self.alert_repo.mark_read_by_task_and_fragment(
+                task_id, AlertType.DELAY_RISK, "responsable"
+            )
+        if "due_date" in changes:
+            new_due = changes["due_date"]
+            if new_due is None or new_due >= date.today():  # type: ignore[operator]
+                await self.alert_repo.mark_read_by_task_and_fragment(
+                    task_id, AlertType.DELAY_RISK, "vencida"
+                )
+
+    async def update(self, task_id: int, data: TaskUpdate, manager_id: int) -> Task:
+        task = await self.get_or_raise(task_id)
+        await self._get_obra_and_assert_access(task.obra_id, manager_id)
+
+        # exclude_unset so that sending {"responsible_id": null} actually
+        # removes the responsible instead of being silently ignored.
+        changes = data.model_dump(exclude_unset=True)
+        if not changes:
+            return task
+
+        # BS-03: capture old values BEFORE any await that could refresh `task`
+        # via the session identity map.
+        old_vals: dict[str, object] = {field: getattr(task, field) for field in changes}
+
+        if changes.get("responsible_id") is not None:
+            await self._assert_responsible_active(changes["responsible_id"])
+
+        if changes.get("depends_on_id") is not None:
+            await self._assert_depends_on_valid(
+                changes["depends_on_id"], task.obra_id, current_task_id=task_id
+            )
+
+        real_changes: dict[str, dict[str, object]] = {
+            field: {"from": _to_json(old_vals[field]), "to": _to_json(new_val)}
+            for field, new_val in changes.items()
+            if old_vals[field] != new_val
+        }
+
+        await self._enrich_all_entries(real_changes)
+
+        updated = await self.repo.update_fields(task_id, **changes)
+
+        if real_changes:
+            changed_labels = [_FIELD_LABELS.get(f, f) for f in real_changes]
+            await self.historial.log(
+                obra_id=task.obra_id,
+                task_id=task_id,
+                event_type="task_updated",
+                description=f"Tarea actualizada: {', '.join(changed_labels)}",
+                payload={"changes": real_changes},
+                triggered_by="user",
+            )
+
+        await self._resolve_update_alerts(task_id, changes)
+        return updated  # type: ignore[return-value]
+
+    async def delete(self, task_id: int, manager_id: int) -> None:
+        task = await self.get_or_raise(task_id)
+        await self._get_obra_and_assert_access(task.obra_id, manager_id)
+
+        # Capture all needed state BEFORE any session mutation (BS-03).
+        obra_id        = task.obra_id
+        title          = task.title
+        responsible_id = task.responsible_id
+        old_status     = task.status.value
+        start_date     = str(task.start_date) if task.start_date else None
+        due_date       = str(task.due_date)   if task.due_date   else None
+
+        # Resolve active alerts for this task before deletion so they no longer
+        # appear as unread in the UI. Alerts are not hard-deleted — they remain
+        # in the DB as is_read=True for audit traceability.
+        await self.alert_repo.mark_read_by_task(task_id)
+
+        # Log the deletion event while the task_id FK is still valid.
+        # After repo.delete() the DB ON DELETE SET NULL will null this FK on
+        # the historial row, but the payload retains full traceability.
+        await self.historial.log(
+            obra_id=obra_id,
+            task_id=task_id,
+            event_type="task_deleted",
+            description=f"La tarea '{title}' fue eliminada.",
+            payload={
+                "task_id":        task_id,
+                "title":          title,
+                "responsible_id": responsible_id,
+                "status":         old_status,
+                "start_date":     start_date,
+                "due_date":       due_date,
+            },
+            triggered_by="user",
+        )
+
+        await self.repo.delete(task_id)
+
+    async def apply_status_update(self, task_id: int, update: TaskStatusUpdate) -> Task:
+        """
+        Called by the AI pipeline after message interpretation.
+        Status is never updated through any public HTTP endpoint.
+        """
+        task = await self.get_or_raise(task_id)
+
+        # Capture before update_status() — session.refresh() inside update_fields()
+        # mutates this same object via the identity map, so task.status would already
+        # equal update.status by the time the post-update comparison runs.
+        old_status = task.status
+
+        allowed = VALID_TRANSITIONS.get(old_status, set())
+        if update.status != old_status and update.status not in allowed:
+            raise UnprocessableError(
+                f"Transition {old_status.value!r} → {update.status.value!r} is not allowed"
+            )
+
+        completed_date = None
+        if update.status == TaskStatus.COMPLETADA:
+            completed_date = update.completed_date or date.today()
+
+        updated = await self.repo.update_status(
+            task_id, update.status, update.estimated_progress, completed_date
+        )
+
+        if update.status != old_status:
+            await self.historial.log(
+                obra_id=task.obra_id,
+                task_id=task_id,
+                event_type="task_status_changed",
+                description=f"Status: {old_status.value} → {update.status.value}",
+                payload={
+                    "from": old_status.value,
+                    "to": update.status.value,
+                    "progress": update.estimated_progress,
+                    "reason": update.reason,
+                },
+                triggered_by=update.triggered_by,
+            )
+
+            if update.status == TaskStatus.BLOQUEADA:
+                blocked_msg = f"La tarea '{task.title}' fue bloqueada."
+                already_blocked = await self.alert_repo.exists_unread_for_task(
+                    task_id, AlertType.TASK_BLOCKED, blocked_msg
+                )
+                if not already_blocked:
+                    await self.alert_repo.create_alert(
+                        alert_type=AlertType.TASK_BLOCKED,
+                        message=blocked_msg,
+                        obra_id=task.obra_id,
+                        task_id=task_id,
+                    )
+
+            # Auto-resolve: task unblocked → resolve all unread task_blocked alerts.
+            if old_status == TaskStatus.BLOQUEADA and update.status != TaskStatus.BLOQUEADA:
+                await self.alert_repo.mark_read_by_task_and_type(
+                    task_id, AlertType.TASK_BLOCKED
+                )
+
+        return updated  # type: ignore[return-value]

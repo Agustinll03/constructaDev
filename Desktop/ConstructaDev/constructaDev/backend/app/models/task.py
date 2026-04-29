@@ -1,0 +1,90 @@
+import enum
+from datetime import date, datetime, timezone
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.core.database import Base
+
+
+class TaskStatus(str, enum.Enum):
+    PENDIENTE = "pendiente"
+    EN_PROGRESO = "en_progreso"
+    BLOQUEADA = "bloqueada"
+    EN_REVISION = "en_revision"
+    COMPLETADA = "completada"
+    CANCELADA = "cancelada"
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    obra_id: Mapped[int] = mapped_column(
+        ForeignKey("obras.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    responsible_id: Mapped[int | None] = mapped_column(
+        ForeignKey("responsibles.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+
+    # Status is set by the system (chatbot pipeline), NOT by users directly.
+    # Default is PENDIENTE. Transitions are enforced in TaskService.
+    status: Mapped[TaskStatus] = mapped_column(
+        SAEnum(
+            TaskStatus,
+            name="task_status",
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+        ),
+        default=TaskStatus.PENDIENTE,
+        nullable=False,
+    )
+
+    # Populated by AI pipeline in Phase 2 (0–100)
+    estimated_progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    start_date: Mapped[date | None] = mapped_column(Date)
+    due_date: Mapped[date | None] = mapped_column(Date)
+    completed_date: Mapped[date | None] = mapped_column(Date)
+
+    # Display order for Gantt (Phase 3)
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Simple dependency: this task waits for another (same obra)
+    depends_on_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    obra: Mapped["Obra"] = relationship("Obra", back_populates="tasks")
+    responsible: Mapped["Responsible | None"] = relationship(
+        "Responsible", back_populates="tasks"
+    )
+    # Self-referential: remote_side must reference the *column variable* (id), not a string
+    depends_on: Mapped["Task | None"] = relationship(
+        "Task", foreign_keys=[depends_on_id], remote_side=[id]
+    )
+    messages: Mapped[list["Message"]] = relationship("Message", back_populates="task")
+    historial: Mapped[list["HistorialEvento"]] = relationship(
+        "HistorialEvento", back_populates="task"
+    )
+    alerts: Mapped[list["Alert"]] = relationship("Alert", back_populates="task")
