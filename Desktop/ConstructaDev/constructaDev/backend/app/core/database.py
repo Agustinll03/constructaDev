@@ -7,13 +7,19 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+
+_engine_kwargs: dict = {"echo": settings.DEBUG}
+if _is_sqlite:
+    from sqlalchemy.pool import StaticPool
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+    _engine_kwargs["poolclass"] = StaticPool
+else:
+    _engine_kwargs["pool_pre_ping"] = True
+    _engine_kwargs["pool_size"] = 10
+    _engine_kwargs["max_overflow"] = 20
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     engine,

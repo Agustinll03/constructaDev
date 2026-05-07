@@ -15,3 +15,407 @@
     min-height: 100vh;
   }
 }
+
+/* ==========================================================
+   LOGIN — Blueprint Studio
+   Arquitectura: panel oscuro + formulario blanco puro.
+   ========================================================== */
+
+.lp-root {
+  display: flex;
+  min-height: 100vh;
+  background: #fff;
+}
+
+/* ── Panel izquierdo ─────────────────────────────────────── */
+.lp-brand {
+  position: relative;
+  width: 460px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px 48px;
+  background: #0D1820;
+  overflow: hidden;
+}
+
+/* Grid tipo papel milimetrado */
+.lp-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Línea de margen derecho (detalle arquitectónico) */
+.lp-accent-line {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 107, 53, 0.25) 20%,
+    rgba(255, 107, 53, 0.25) 80%,
+    transparent 100%
+  );
+}
+
+/* Header — logo */
+.lp-brand-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.lp-logomark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #FF6B35;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px -4px rgba(255,107,53,0.5), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+
+.lp-wordmark {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #fff;
+}
+
+/* Cuerpo editorial */
+.lp-brand-body {
+  position: relative;
+  z-index: 2;
+}
+
+.lp-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #4A6070;
+  margin-bottom: 28px;
+}
+.lp-eyebrow-line {
+  display: inline-block;
+  width: 22px;
+  height: 1px;
+  background: #4A6070;
+  flex-shrink: 0;
+}
+
+.lp-headline {
+  font-size: clamp(32px, 3.2vw, 46px);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #FFFFFF;
+  margin: 0 0 20px;
+}
+.lp-headline-accent {
+  color: #FF6B35;
+}
+
+.lp-lede {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: #5A7080;
+  max-width: 340px;
+  margin: 0;
+}
+
+/* Dibujo arquitectónico SVG */
+.lp-arch-drawing {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 300px;
+  opacity: 0.9;
+}
+.lp-arch-drawing svg {
+  width: 100%;
+  height: auto;
+}
+
+/* Footer */
+.lp-brand-footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #2D4050;
+}
+
+.lp-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.lp-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #43A047;
+  box-shadow: 0 0 0 3px rgba(67,160,71,0.2);
+  flex-shrink: 0;
+}
+
+/* ── Panel derecho — formulario ──────────────────────────── */
+.lp-form-panel {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  background: #fff;
+}
+
+/* Guías de columna muy sutiles */
+.lp-col-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(to right, rgba(0,0,0,0.025) 1px, transparent 1px);
+  background-size: 80px 100%;
+  background-position: 24px 0;
+}
+
+/* Logo solo en mobile */
+.lp-mobile-brand {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 40px;
+}
+.lp-mobile-brand .lp-logomark {
+  width: 30px;
+  height: 30px;
+}
+
+/* Form wrap — sin card, solo contenido flotante */
+.lp-form-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+}
+
+.lp-form-head {
+  margin-bottom: 36px;
+}
+.lp-form-title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #263238;
+  margin: 0 0 8px;
+  line-height: 1.1;
+}
+.lp-form-sub {
+  font-size: 14.5px;
+  color: #607D8B;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Campos */
+.lp-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.lp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.lp-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #607D8B;
+}
+
+.lp-input-wrap {
+  position: relative;
+}
+
+.lp-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1.5px solid #DDE3E8;
+  background: #FAFAFA;
+  color: #263238;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.lp-input::placeholder {
+  color: #A8B6BE;
+}
+.lp-input:hover {
+  border-color: #C3CDD4;
+  background: #fff;
+}
+.lp-input:focus {
+  border-color: #FF6B35;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255,107,53,0.1);
+}
+.lp-input-padded {
+  padding-right: 88px;
+}
+
+/* Botón revelar */
+.lp-reveal {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #90A4AE;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.lp-reveal:hover {
+  color: #263238;
+  background: #ECEFF1;
+}
+
+/* Error */
+.lp-error {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: #FFF5F2;
+  border: 1px solid #FFCDB8;
+  color: #B54020;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Botón principal */
+.lp-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 8px;
+  border: none;
+  background: #FF6B35;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  box-shadow: 0 4px 14px -4px rgba(255,107,53,0.45);
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.1s ease;
+}
+.lp-btn:hover:not(:disabled) {
+  background: #E85A20;
+  box-shadow: 0 6px 20px -4px rgba(255,107,53,0.55);
+}
+.lp-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px -2px rgba(255,107,53,0.35);
+}
+.lp-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Spinner */
+.lp-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  animation: lpSpin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes lpSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Footer */
+.lp-form-footer {
+  position: absolute;
+  bottom: 24px;
+  font-size: 11px;
+  color: #CFD8DC;
+  letter-spacing: 0.06em;
+}
+
+/* Utilidad: ocultar opacity para GSAP */
+.lp-item {
+  opacity: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .lp-brand {
+    width: 380px;
+    padding: 36px 36px;
+  }
+}
+
+@media (max-width: 768px) {
+  .lp-root {
+    flex-direction: column;
+  }
+  .lp-brand {
+    display: none;
+  }
+  .lp-form-panel {
+    min-height: 100vh;
+    padding: 40px 24px;
+    justify-content: center;
+  }
+  .lp-mobile-brand {
+    display: flex;
+  }
+  .lp-col-guides {
+    display: none;
+  }
+}
