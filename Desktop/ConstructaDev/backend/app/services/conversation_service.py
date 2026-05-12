@@ -2,17 +2,26 @@
 Structured menu-based conversation state machine for WhatsApp chatbot.
 
 Flow:
-  idle       → 0 tasks: "sin tareas"
-             → 1 task:  show status menu directly
-             → N tasks: show numbered task list
-  task_select → user sends "1"/"2"/...  → advance to status_menu
-  status_menu → "1" en curso / "2" finalizada / "3" demorada / "4" reprogramar fecha
-  await_date  → user sends DD/MM or DD/MM/AAAA → update due_date
+  idle        → 0 tasks: "sin tareas"
+              → 1 task:  show status menu directly
+              → N tasks: show paginated task list (5 per page)
+  task_select → "1"–"5": select task → status_menu
+              → "6":     next page (if more tasks)
+              → "0":     previous page / cancel if on first page
+              → "X":     cancel → idle
+  status_menu → "1" en curso / "2" finalizada / "3" demorada / "4" reprogramar
+              → "0":     back to task_select (or idle if single-task flow)
+              → "X":     cancel → idle
+  await_date  → DD/MM or DD/MM/AAAA → update due_date
+              → "0":     back to status_menu
+              → "X":     cancel → idle
 
 Session expires after 30 minutes of inactivity.
+Navigation keywords "MENU" / "INICIO" / "HOLA" always restart the flow.
 """
 import re
 from datetime import date, datetime, timezone
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +36,7 @@ from app.repositories.task import TaskRepository
 from app.schemas.task import TaskStatusUpdate
 from app.services.message_templates import (
     build_already_in_status_message,
+    build_cancelled_message,
     build_confirmation_message,
     build_no_tasks_message,
     build_reminder_message,
@@ -39,12 +49,87 @@ from app.services.message_templates import (
 )
 from app.services.task_service import TaskService
 
+# ── Constants ──────────────────────────────────────────────────────────────────
+
 _DATE_RE = re.compile(r"^(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?$")
+_TASKS_PER_PAGE = 5
+
+# ── task_options pagination helpers ───────────────────────────────────────────
+#
+# task_options layout when total tasks > _TASKS_PER_PAGE:
+#   [{"_meta": True, "page": N, "total": T}, task1, task2, ...]
+#
+# When total tasks <= _TASKS_PER_PAGE: plain list [task1, task2, ...]
+# Meta dict has no "id" key so all existing lookups skip it safely.
+
+def _has_meta(options: list[dict]) -> bool:
+    return bool(options) and options[0].get("_meta") is True
 
 
-def _task_option(idx: int, task: Task, obra_name: str) -> dict:
+def _page_of(options: list[dict]) -> int:
+    return options[0]["page"] if _has_meta(options) else 0
+
+
+def _all_tasks(options: list[dict]) -> list[dict]:
+    return options[1:] if _has_meta(options) else options
+
+
+def _page_tasks(options: list[dict]) -> list[dict]:
+    """Tasks visible on the current page."""
+    page = _page_of(options)
+    tasks = _all_tasks(options)
+    start = page * _TASKS_PER_PAGE
+    return tasks[start : start + _TASKS_PER_PAGE]
+
+
+def _has_more(options: list[dict]) -> bool:
+    page = _page_of(options)
+    return (page + 1) * _TASKS_PER_PAGE < len(_all_tasks(options))
+
+
+def _remaining(options: list[dict]) -> int:
+    page = _page_of(options)
+    shown = (page + 1) * _TASKS_PER_PAGE
+    return max(0, len(_all_tasks(options)) - shown)
+
+
+def _with_meta(tasks: list[dict], page: int) -> list[dict]:
+    return [{"_meta": True, "page": page, "total": len(tasks)}, *tasks]
+
+
+def _next_page(options: list[dict]) -> list[dict]:
+    return _with_meta(_all_tasks(options), _page_of(options) + 1)
+
+
+def _prev_page(options: list[dict]) -> list[dict]:
+    return _with_meta(_all_tasks(options), max(0, _page_of(options) - 1))
+
+
+def _make_task_options(tasks: list[dict]) -> list[dict]:
+    """Wrap task list with meta if pagination is needed."""
+    if len(tasks) > _TASKS_PER_PAGE:
+        return _with_meta(tasks, 0)
+    return tasks
+
+
+# ── Navigation command detection ──────────────────────────────────────────────
+
+def _is_cancel(body: str | None) -> bool:
+    return bool(body) and body.strip().lower() in ("x", "cancelar", "salir")
+
+
+def _is_back(body: str | None) -> bool:
+    return bool(body) and body.strip() == "0"
+
+
+def _is_menu(body: str | None) -> bool:
+    return bool(body) and body.strip().lower() in ("menu", "menú", "inicio", "hola", "start")
+
+
+# ── Misc helpers ───────────────────────────────────────────────────────────────
+
+def _task_dict(task: Task, obra_name: str) -> dict:
     return {
-        "idx":       idx,
         "id":        task.id,
         "title":     task.title,
         "obra_name": obra_name,
@@ -52,7 +137,7 @@ def _task_option(idx: int, task: Task, obra_name: str) -> dict:
     }
 
 
-def _parse_option(body: str | None, max_val: int = 4) -> int | None:
+def _parse_option(body: str | None, max_val: int) -> int | None:
     if not body:
         return None
     s = body.strip()
@@ -93,6 +178,8 @@ def _parse_date(body: str | None) -> date | None:
         return None
 
 
+# ── Service ────────────────────────────────────────────────────────────────────
+
 class ConversationService:
     def __init__(self, session: AsyncSession) -> None:
         self.db = session
@@ -111,12 +198,22 @@ class ConversationService:
         Process one inbound text message.
         Returns (reply_text, task_id_or_None).
         """
+        # Global restart commands override any current state
+        if _is_menu(body):
+            await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
+            return await self._start_fresh(responsible)
+
         conv = await self.session_repo.get_by_responsible(responsible.id)
         now = datetime.now(timezone.utc)
         is_expired = conv is None or conv.expires_at.replace(tzinfo=timezone.utc) < now
 
         if is_expired or conv.step == ConversationStep.IDLE:
             return await self._start_fresh(responsible)
+
+        # Global cancel — reset to idle from any step
+        if _is_cancel(body):
+            await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
+            return build_cancelled_message(), None
 
         if conv.step == ConversationStep.TASK_SELECT:
             return await self._handle_task_select(responsible, conv, body)
@@ -137,18 +234,18 @@ class ConversationService:
         Seeds a STATUS_MENU session so the user's reply is immediately routed.
         Returns the reminder message text to send.
         """
-        opt = _task_option(1, task, obra_name)
+        td = _task_dict(task, obra_name)
         await self.session_repo.upsert(
             responsible.id,
             ConversationStep.STATUS_MENU,
             selected_task_id=task.id,
-            task_options=[opt],
+            task_options=[td],
         )
         return build_reminder_message(
             responsible.full_name,
-            task_name=opt["title"],
-            obra_name=opt["obra_name"],
-            due_date=opt["due_date"],
+            task_name=td["title"],
+            obra_name=td["obra_name"],
+            due_date=td["due_date"],
         )
 
     # ── step handlers ──────────────────────────────────────────────────────────
@@ -164,32 +261,46 @@ class ConversationService:
             task = tasks[0]
             obra = await self.obra_repo.get(task.obra_id)
             obra_name = obra.name if obra else f"Obra #{task.obra_id}"
-            opt = _task_option(1, task, obra_name)
+            td = _task_dict(task, obra_name)
             await self.session_repo.upsert(
                 responsible.id,
                 ConversationStep.STATUS_MENU,
                 selected_task_id=task.id,
-                task_options=[opt],
+                task_options=[td],
             )
             return (
                 build_status_menu_message(
                     responsible.full_name,
-                    task_name=opt["title"],
-                    obra_name=opt["obra_name"],
-                    due_date=opt["due_date"],
+                    task_name=td["title"],
+                    obra_name=td["obra_name"],
+                    due_date=td["due_date"],
+                    can_go_back=False,
                 ),
                 task.id,
             )
 
-        options = []
-        for i, task in enumerate(tasks, start=1):
+        # Multiple tasks — build full list + paginate
+        all_task_dicts: list[dict[str, Any]] = []
+        for task in tasks:
             obra = await self.obra_repo.get(task.obra_id)
             obra_name = obra.name if obra else f"Obra #{task.obra_id}"
-            options.append(_task_option(i, task, obra_name))
+            all_task_dicts.append(_task_dict(task, obra_name))
+
+        options = _make_task_options(all_task_dicts)
         await self.session_repo.upsert(
             responsible.id, ConversationStep.TASK_SELECT, task_options=options
         )
-        return build_task_list_message(responsible.full_name, options), None
+        pg = _page_tasks(options)
+        return (
+            build_task_list_message(
+                responsible.full_name,
+                pg,
+                has_more=_has_more(options),
+                remaining=_remaining(options),
+                is_first_page=True,
+            ),
+            None,
+        )
 
     async def _handle_task_select(
         self,
@@ -198,22 +309,76 @@ class ConversationService:
         body: str | None,
     ) -> tuple[str, int | None]:
         options = conv.task_options or []
-        n = _parse_option(body, max_val=len(options)) if body else None
+        pg = _page_tasks(options)
+        is_first_page = _page_of(options) == 0
+        has_more = _has_more(options)
+        ver_mas_idx = len(pg) + 1
 
-        if n is None or n < 1 or n > len(options):
+        # "0" on first page → cancel (no previous step)
+        if _is_back(body):
+            if is_first_page:
+                await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
+                return build_cancelled_message(), None
+            # Go to previous page
+            prev = _prev_page(options)
+            await self.session_repo.upsert(
+                responsible.id, ConversationStep.TASK_SELECT, task_options=prev
+            )
+            prev_pg = _page_tasks(prev)
+            return (
+                build_task_list_message(
+                    responsible.full_name,
+                    prev_pg,
+                    has_more=True,  # there's a next page (the one we just came from)
+                    remaining=_remaining(prev),
+                    is_first_page=_page_of(prev) == 0,
+                ),
+                None,
+            )
+
+        # "Ver más" option
+        if has_more and body and body.strip() == str(ver_mas_idx):
+            nxt = _next_page(options)
+            await self.session_repo.upsert(
+                responsible.id, ConversationStep.TASK_SELECT, task_options=nxt
+            )
+            nxt_pg = _page_tasks(nxt)
+            return (
+                build_task_list_message(
+                    responsible.full_name,
+                    nxt_pg,
+                    has_more=_has_more(nxt),
+                    remaining=_remaining(nxt),
+                    is_first_page=False,
+                ),
+                None,
+            )
+
+        # Normal task selection
+        n = _parse_option(body, max_val=len(pg))
+        if n is None:
             await self.session_repo.upsert(
                 responsible.id, ConversationStep.TASK_SELECT, task_options=options
             )
-            menu = build_task_list_message(responsible.full_name, options)
             prefix = "Opción inválida.\n\n" if body and body.strip() else ""
-            return prefix + menu, None
+            return (
+                prefix + build_task_list_message(
+                    responsible.full_name,
+                    pg,
+                    has_more=has_more,
+                    remaining=_remaining(options),
+                    is_first_page=is_first_page,
+                ),
+                None,
+            )
 
-        chosen = options[n - 1]
+        chosen = pg[n - 1]
+        all_options = _all_tasks(options)
         await self.session_repo.upsert(
             responsible.id,
             ConversationStep.STATUS_MENU,
             selected_task_id=chosen["id"],
-            task_options=options,
+            task_options=all_options,  # store all tasks (no pagination meta needed in status_menu)
         )
         return (
             build_status_menu_message(
@@ -221,6 +386,7 @@ class ConversationService:
                 task_name=chosen["title"],
                 obra_name=chosen["obra_name"],
                 due_date=chosen["due_date"],
+                can_go_back=True,
             ),
             chosen["id"],
         )
@@ -231,10 +397,35 @@ class ConversationService:
         conv: ConversationSession,
         body: str | None,
     ) -> tuple[str, int | None]:
-        n = _parse_option(body)
         task_id = conv.selected_task_id
         options = conv.task_options or []
-        opt = next((o for o in options if o["id"] == task_id), None)
+
+        # "0" → back to task_select (if there were multiple tasks) or idle
+        if _is_back(body):
+            all_tasks = _all_tasks(options)
+            if len(all_tasks) > 1:
+                # Rebuild options with pagination and go back to task_select
+                paged = _make_task_options(all_tasks)
+                await self.session_repo.upsert(
+                    responsible.id, ConversationStep.TASK_SELECT, task_options=paged
+                )
+                pg = _page_tasks(paged)
+                return (
+                    build_task_list_message(
+                        responsible.full_name,
+                        pg,
+                        has_more=_has_more(paged),
+                        remaining=_remaining(paged),
+                        is_first_page=True,
+                    ),
+                    None,
+                )
+            # Single-task flow — no previous step
+            await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
+            return build_cancelled_message(), None
+
+        opt = next((o for o in _all_tasks(options) if o.get("id") == task_id), None)
+        n = _parse_option(body, max_val=4)
 
         if n is None:
             await self.session_repo.upsert(
@@ -243,15 +434,16 @@ class ConversationService:
                 selected_task_id=task_id,
                 task_options=options,
             )
-            if opt:
-                menu = build_status_menu_message(
+            menu = (
+                build_status_menu_message(
                     responsible.full_name,
                     task_name=opt["title"],
                     obra_name=opt["obra_name"],
                     due_date=opt["due_date"],
+                    can_go_back=len(_all_tasks(options)) > 1,
                 )
-            else:
-                menu = "Error interno. Intentá de nuevo."
+                if opt else "Error interno. Intentá de nuevo."
+            )
             prefix = "Opción inválida.\n\n" if body and body.strip() else ""
             return prefix + menu, task_id
 
@@ -272,7 +464,7 @@ class ConversationService:
                 )
                 title = opt["title"] if opt else f"Tarea #{task_id}"
                 due = opt["due_date"] if opt else "sin fecha"
-                return build_reschedule_request_message(title, due), task_id
+                return build_reschedule_request_message(title, due, can_go_back=True), task_id
         except Exception:
             await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
             return "Ocurrió un error al actualizar la tarea. Por favor intentá de nuevo.", task_id
@@ -292,9 +484,28 @@ class ConversationService:
     ) -> tuple[str, int | None]:
         task_id = conv.selected_task_id
         options = conv.task_options or []
-        opt = next((o for o in options if o["id"] == task_id), None)
+        opt = next((o for o in _all_tasks(options) if o.get("id") == task_id), None)
         title = opt["title"] if opt else f"Tarea #{task_id}"
         current_due = opt["due_date"] if opt else "sin fecha"
+
+        # "0" → back to status_menu
+        if _is_back(body):
+            await self.session_repo.upsert(
+                responsible.id,
+                ConversationStep.STATUS_MENU,
+                selected_task_id=task_id,
+                task_options=options,
+            )
+            return (
+                build_status_menu_message(
+                    responsible.full_name,
+                    task_name=title,
+                    obra_name=opt["obra_name"] if opt else "",
+                    due_date=current_due,
+                    can_go_back=len(_all_tasks(options)) > 1,
+                ),
+                task_id,
+            )
 
         new_date = _parse_date(body)
         if new_date is None:
@@ -306,7 +517,7 @@ class ConversationService:
             )
             return (
                 "Formato inválido.\n\n"
-                + build_reschedule_request_message(title, current_due),
+                + build_reschedule_request_message(title, current_due, can_go_back=True),
                 task_id,
             )
 
@@ -354,9 +565,7 @@ class ConversationService:
         title = opt["title"] if opt else task.title
 
         if task.status == TaskStatus.EN_PROGRESO:
-            return build_already_in_status_message(
-                responsible.full_name, title, "en_progreso"
-            )
+            return build_already_in_status_message(responsible.full_name, title, "en_progreso")
 
         await self.task_service.apply_status_update(
             task_id,
@@ -380,9 +589,7 @@ class ConversationService:
         title = opt["title"] if opt else task.title
 
         if task.status == TaskStatus.COMPLETADA:
-            return build_already_in_status_message(
-                responsible.full_name, title, "completada"
-            )
+            return build_already_in_status_message(responsible.full_name, title, "completada")
 
         await self.task_service.force_complete(task_id, triggered_by="chatbot")
         return build_confirmation_message(responsible.full_name, title, "completada")
@@ -398,9 +605,7 @@ class ConversationService:
         title = opt["title"] if opt else task.title
 
         if task.status == TaskStatus.BLOQUEADA:
-            return build_already_in_status_message(
-                responsible.full_name, title, "bloqueada"
-            )
+            return build_already_in_status_message(responsible.full_name, title, "bloqueada")
 
         await self.task_service.force_block(task_id, triggered_by="chatbot")
         return build_confirmation_message(responsible.full_name, title, "bloqueada")
