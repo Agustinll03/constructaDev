@@ -25,7 +25,8 @@ from app.repositories.obra import ObraRepository
 from app.repositories.responsible import ResponsibleRepository
 from app.repositories.settings import SettingsRepository
 from app.repositories.task import TaskRepository
-from app.services.conversation_service import ConversationService, _fmt_date
+from app.services.conversation_service import ConversationService
+from app.services.message_templates import fmt_date
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ class NotificationService:
 
             msg = (
                 f"La tarea '{task.title}' está vencida "
-                f"(venció el {_fmt_date(task.due_date)})."
+                f"(venció el {fmt_date(task.due_date)})."
             )
             if not await self.alert_repo.exists_for_task(task.id, AlertType.TASK_OVERDUE, msg):
                 await self.alert_repo.create_alert(

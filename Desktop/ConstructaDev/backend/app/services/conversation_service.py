@@ -25,60 +25,31 @@ from app.repositories.historial import HistorialRepository
 from app.repositories.obra import ObraRepository
 from app.repositories.task import TaskRepository
 from app.schemas.task import TaskStatusUpdate
+from app.services.message_templates import (
+    build_already_in_status_message,
+    build_confirmation_message,
+    build_no_tasks_message,
+    build_reminder_message,
+    build_reschedule_confirmation_message,
+    build_reschedule_request_message,
+    build_status_menu_message,
+    build_task_list_message,
+    fmt_date,
+    fmt_date_full,
+)
 from app.services.task_service import TaskService
 
 _DATE_RE = re.compile(r"^(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?$")
 
 
-def _fmt_date(d: date | str | None) -> str:
-    if d is None:
-        return "sin fecha"
-    s = str(d)
-    if len(s) == 10 and s[4] == "-":
-        _, m, day = s.split("-")
-        return f"{day}/{m}"
-    return s
-
-
 def _task_option(idx: int, task: Task, obra_name: str) -> dict:
     return {
-        "idx": idx,
-        "id": task.id,
-        "title": task.title,
+        "idx":       idx,
+        "id":        task.id,
+        "title":     task.title,
         "obra_name": obra_name,
-        "due_date": _fmt_date(task.due_date),
+        "due_date":  fmt_date(task.due_date),
     }
-
-
-def _task_list_msg(name: str, options: list[dict]) -> str:
-    lines = [f"Hola {name}. Estas son tus tareas activas:\n"]
-    for o in options:
-        lines.append(f"{o['idx']}. {o['obra_name']} – {o['title']} – vence {o['due_date']}")
-    lines.append("\nSeleccioná el número de la tarea que querés actualizar.")
-    return "\n".join(lines)
-
-
-def _status_menu_msg(name: str, opt: dict) -> str:
-    return (
-        f"Hola {name}.\n\n"
-        f"Obra: {opt['obra_name']}\n"
-        f"Tarea: {opt['title']}\n"
-        f"Vencimiento: {opt['due_date']}\n\n"
-        "Seleccioná el estado actual:\n\n"
-        "1. En curso\n"
-        "2. Finalizada\n"
-        "3. Demorada\n"
-        "4. Reprogramar fecha"
-    )
-
-
-def _date_request_msg(opt: dict) -> str:
-    return (
-        f"Tarea: {opt['title']}\n\n"
-        "Indicá la nueva fecha estimada.\n"
-        "Formato: DD/MM o DD/MM/AAAA\n"
-        "Ejemplo: 15/01 o 15/01/2027"
-    )
 
 
 def _parse_option(body: str | None, max_val: int = 4) -> int | None:
@@ -106,15 +77,13 @@ def _parse_date(body: str | None) -> date | None:
         if year < 100:
             year += 2000
     else:
+        from datetime import timedelta
         today = date.today()
         year = today.year
         try:
             candidate = date(year, month, day)
         except ValueError:
             return None
-        # If the date without year is already in the past, assume next year.
-        # Threshold: more than 7 days ago (allows same-week corrections).
-        from datetime import timedelta
         if candidate < today - timedelta(days=7):
             year += 1
 
@@ -166,7 +135,7 @@ class ConversationService:
         """
         Called by NotificationService before sending a proactive reminder.
         Seeds a STATUS_MENU session so the user's reply is immediately routed.
-        Returns the message text to send.
+        Returns the reminder message text to send.
         """
         opt = _task_option(1, task, obra_name)
         await self.session_repo.upsert(
@@ -175,7 +144,12 @@ class ConversationService:
             selected_task_id=task.id,
             task_options=[opt],
         )
-        return _status_menu_msg(responsible.full_name, opt)
+        return build_reminder_message(
+            responsible.full_name,
+            task_name=opt["title"],
+            obra_name=opt["obra_name"],
+            due_date=opt["due_date"],
+        )
 
     # ── step handlers ──────────────────────────────────────────────────────────
 
@@ -184,11 +158,7 @@ class ConversationService:
 
         if not tasks:
             await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
-            return (
-                f"Hola {responsible.full_name}. "
-                "No tenés tareas activas asignadas en este momento.",
-                None,
-            )
+            return build_no_tasks_message(responsible.full_name), None
 
         if len(tasks) == 1:
             task = tasks[0]
@@ -201,7 +171,15 @@ class ConversationService:
                 selected_task_id=task.id,
                 task_options=[opt],
             )
-            return _status_menu_msg(responsible.full_name, opt), task.id
+            return (
+                build_status_menu_message(
+                    responsible.full_name,
+                    task_name=opt["title"],
+                    obra_name=opt["obra_name"],
+                    due_date=opt["due_date"],
+                ),
+                task.id,
+            )
 
         options = []
         for i, task in enumerate(tasks, start=1):
@@ -211,7 +189,7 @@ class ConversationService:
         await self.session_repo.upsert(
             responsible.id, ConversationStep.TASK_SELECT, task_options=options
         )
-        return _task_list_msg(responsible.full_name, options), None
+        return build_task_list_message(responsible.full_name, options), None
 
     async def _handle_task_select(
         self,
@@ -226,8 +204,9 @@ class ConversationService:
             await self.session_repo.upsert(
                 responsible.id, ConversationStep.TASK_SELECT, task_options=options
             )
-            prefix = "Opción inválida. " if body and body.strip() else ""
-            return prefix + _task_list_msg(responsible.full_name, options), None
+            menu = build_task_list_message(responsible.full_name, options)
+            prefix = "Opción inválida.\n\n" if body and body.strip() else ""
+            return prefix + menu, None
 
         chosen = options[n - 1]
         await self.session_repo.upsert(
@@ -236,7 +215,15 @@ class ConversationService:
             selected_task_id=chosen["id"],
             task_options=options,
         )
-        return _status_menu_msg(responsible.full_name, chosen), chosen["id"]
+        return (
+            build_status_menu_message(
+                responsible.full_name,
+                task_name=chosen["title"],
+                obra_name=chosen["obra_name"],
+                due_date=chosen["due_date"],
+            ),
+            chosen["id"],
+        )
 
     async def _handle_status_menu(
         self,
@@ -256,8 +243,16 @@ class ConversationService:
                 selected_task_id=task_id,
                 task_options=options,
             )
-            menu = _status_menu_msg(responsible.full_name, opt) if opt else "Error interno."
-            prefix = "Opción inválida. " if body and body.strip() else ""
+            if opt:
+                menu = build_status_menu_message(
+                    responsible.full_name,
+                    task_name=opt["title"],
+                    obra_name=opt["obra_name"],
+                    due_date=opt["due_date"],
+                )
+            else:
+                menu = "Error interno. Intentá de nuevo."
+            prefix = "Opción inválida.\n\n" if body and body.strip() else ""
             return prefix + menu, task_id
 
         try:
@@ -268,13 +263,16 @@ class ConversationService:
             elif n == 3:
                 reply = await self._apply_demorada(responsible, task_id, opt)
             else:
+                # Option 4: reschedule date
                 await self.session_repo.upsert(
                     responsible.id,
                     ConversationStep.AWAIT_DATE,
                     selected_task_id=task_id,
                     task_options=options,
                 )
-                return _date_request_msg(opt or {"title": f"Tarea #{task_id}"}), task_id
+                title = opt["title"] if opt else f"Tarea #{task_id}"
+                due = opt["due_date"] if opt else "sin fecha"
+                return build_reschedule_request_message(title, due), task_id
         except Exception:
             await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
             return "Ocurrió un error al actualizar la tarea. Por favor intentá de nuevo.", task_id
@@ -296,6 +294,7 @@ class ConversationService:
         options = conv.task_options or []
         opt = next((o for o in options if o["id"] == task_id), None)
         title = opt["title"] if opt else f"Tarea #{task_id}"
+        current_due = opt["due_date"] if opt else "sin fecha"
 
         new_date = _parse_date(body)
         if new_date is None:
@@ -306,7 +305,8 @@ class ConversationService:
                 task_options=options,
             )
             return (
-                "Formato inválido. " + _date_request_msg(opt or {"title": title}),
+                "Formato inválido.\n\n"
+                + build_reschedule_request_message(title, current_due),
                 task_id,
             )
 
@@ -320,7 +320,7 @@ class ConversationService:
                     obra_id=task.obra_id,
                     task_id=task_id,
                     event_type="task_rescheduled",
-                    description=f"Fecha reprogramada: {_fmt_date(old_due_date)} → {_fmt_date(new_date)}",
+                    description=f"Fecha reprogramada: {fmt_date(old_due_date)} → {fmt_date(new_date)}",
                     payload={
                         "from": str(old_due_date) if old_due_date else None,
                         "to": str(new_date),
@@ -333,8 +333,11 @@ class ConversationService:
             task = await self.task_repo.get(task_id)
             if task:
                 await emit_task_updated(task)
+
         return (
-            f"Registrado. La tarea «{title}» fue reprogramada para el {_fmt_date(new_date)}.",
+            build_reschedule_confirmation_message(
+                responsible.full_name, title, fmt_date_full(new_date)
+            ),
             task_id,
         )
 
@@ -351,7 +354,9 @@ class ConversationService:
         title = opt["title"] if opt else task.title
 
         if task.status == TaskStatus.EN_PROGRESO:
-            return f"La tarea «{title}» ya está en curso."
+            return build_already_in_status_message(
+                responsible.full_name, title, "en_progreso"
+            )
 
         await self.task_service.apply_status_update(
             task_id,
@@ -362,7 +367,7 @@ class ConversationService:
                 reason="En curso vía WhatsApp",
             ),
         )
-        return f"Registrado {responsible.full_name}. La tarea «{title}» está en curso."
+        return build_confirmation_message(responsible.full_name, title, "en_progreso")
 
     async def _apply_finalizada(
         self, responsible: Responsible, task_id: int | None, opt: dict | None
@@ -375,10 +380,12 @@ class ConversationService:
         title = opt["title"] if opt else task.title
 
         if task.status == TaskStatus.COMPLETADA:
-            return f"La tarea «{title}» ya estaba marcada como finalizada."
+            return build_already_in_status_message(
+                responsible.full_name, title, "completada"
+            )
 
         await self.task_service.force_complete(task_id, triggered_by="chatbot")
-        return f"¡Excelente {responsible.full_name}! La tarea «{title}» fue marcada como finalizada."
+        return build_confirmation_message(responsible.full_name, title, "completada")
 
     async def _apply_demorada(
         self, responsible: Responsible, task_id: int | None, opt: dict | None
@@ -391,10 +398,9 @@ class ConversationService:
         title = opt["title"] if opt else task.title
 
         if task.status == TaskStatus.BLOQUEADA:
-            return f"La tarea «{title}» ya estaba marcada como demorada."
+            return build_already_in_status_message(
+                responsible.full_name, title, "bloqueada"
+            )
 
         await self.task_service.force_block(task_id, triggered_by="chatbot")
-        return (
-            f"Entendido {responsible.full_name}. La tarea «{title}» fue marcada como demorada. "
-            "El encargado fue notificado."
-        )
+        return build_confirmation_message(responsible.full_name, title, "bloqueada")
