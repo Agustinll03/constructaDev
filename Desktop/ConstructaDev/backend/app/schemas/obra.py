@@ -7,6 +7,7 @@ class ObraCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
     description: str | None = None
     location: str | None = None
+    image_url: str | None = None
     start_date: date | None = None
     expected_end_date: date | None = None
 
@@ -22,6 +23,7 @@ class ObraUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=255)
     description: str | None = None
     location: str | None = None
+    image_url: str | None = None
     status: ObraStatus | None = None
     start_date: date | None = None
     expected_end_date: date | None = None
@@ -42,6 +44,7 @@ class ObraRead(BaseModel):
     name: str
     description: str | None
     location: str | None
+    image_url: str | None
     status: ObraStatus
     manager_id: int
     start_date: date | None
@@ -59,6 +62,7 @@ class ObraSummary(BaseModel):
     name: str
     status: ObraStatus
     location: str | None
+    image_url: str | None
     start_date: date | None
     expected_end_date: date | None
     actual_end_date: date | None

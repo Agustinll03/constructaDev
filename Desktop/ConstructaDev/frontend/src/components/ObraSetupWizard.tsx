@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type ChangeEvent, type KeyboardEvent } from "react";
+import { useState, useRef, type ReactNode, type ChangeEvent, type KeyboardEvent } from "react";
 import {
   X,
   Plus,
@@ -9,7 +9,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Upload,
+  ImageOff,
 } from "lucide-react";
+import { uploadImage } from "../api/upload";
 import { createObra } from "../api/obras";
 import { createResponsible } from "../api/responsibles";
 import { createTask } from "../api/tasks";
@@ -22,6 +25,7 @@ interface ObraFormData {
   name: string;
   location: string;
   description: string;
+  image_url: string;
   start_date: string;
   expected_end_date: string;
 }
@@ -169,9 +173,61 @@ function Step1({
   onChange: (d: ObraFormData) => void;
   errors: Record<string, string>;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(data.image_url || null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [imgLoadError, setImgLoadError] = useState(false);
+
   function set(field: keyof ObraFormData) {
     return (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       onChange({ ...data, [field]: e.target.value });
+  }
+
+  async function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Solo se aceptan imágenes (JPG, PNG, WebP).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("La imagen no puede superar 5 MB.");
+      return;
+    }
+
+    const localUrl = URL.createObjectURL(file);
+    setPreview(localUrl);
+    setImgLoadError(false);
+    setUploadError(null);
+    setUploading(true);
+
+    try {
+      const url = await uploadImage(file);
+      onChange({ ...data, image_url: url });
+    } catch {
+      setUploadError("Error al subir la imagen. Intentá de nuevo.");
+      setPreview(null);
+      onChange({ ...data, image_url: "" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+    e.target.value = "";
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+  }
+
+  function clearImage() {
+    setPreview(null);
+    setUploadError(null);
+    onChange({ ...data, image_url: "" });
   }
 
   return (
@@ -206,10 +262,82 @@ function Step1({
         <textarea
           className={[inputCls(), "resize-none"].join(" ")}
           placeholder="Descripción breve del proyecto..."
-          rows={3}
+          rows={2}
           value={data.description}
           onChange={set("description")}
         />
+      </div>
+
+      {/* Image upload */}
+      <div>
+        <FieldLabel optional>Foto de la obra</FieldLabel>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={handleInputChange}
+        />
+
+        {preview && !imgLoadError ? (
+          <div className="relative h-36 rounded overflow-hidden border border-constructa-border group">
+            <img
+              src={preview}
+              alt="Preview"
+              className="w-full h-full object-cover"
+              onError={() => setImgLoadError(true)}
+            />
+            {uploading ? (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 text-white animate-spin" />
+                <span className="text-white text-xs font-mono">Subiendo...</span>
+              </div>
+            ) : (
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="text-xs text-white bg-black/60 hover:bg-black/80 px-3 py-1.5 rounded transition-colors font-mono"
+                >
+                  Cambiar
+                </button>
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  className="p-1.5 bg-black/60 hover:bg-constructa-danger/80 rounded transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => fileRef.current?.click()}
+            onKeyDown={(e) => e.key === "Enter" && fileRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            className="h-36 rounded border-2 border-dashed border-constructa-border hover:border-constructa-primary cursor-pointer flex flex-col items-center justify-center gap-2 transition-colors group bg-constructa-surface/40"
+          >
+            {imgLoadError ? (
+              <ImageOff className="w-6 h-6 text-constructa-border" />
+            ) : (
+              <Upload className="w-6 h-6 text-constructa-border group-hover:text-constructa-primary transition-colors" />
+            )}
+            <div className="text-center">
+              <p className="text-xs text-constructa-text font-semibold">
+                Hacé click o arrastrá una foto
+              </p>
+              <p className="text-[10px] text-constructa-border mt-0.5 font-mono">
+                JPG · PNG · WebP — máx. 5 MB
+              </p>
+            </div>
+          </div>
+        )}
+
+        {uploadError && <FieldError msg={uploadError} />}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -735,6 +863,7 @@ export function ObraSetupWizard({ onClose, onCreated }: ObraSetupWizardProps) {
     name: "",
     location: "",
     description: "",
+    image_url: "",
     start_date: "",
     expected_end_date: "",
   });
@@ -901,6 +1030,7 @@ export function ObraSetupWizard({ onClose, onCreated }: ObraSetupWizardProps) {
         name: obraData.name.trim(),
         location: obraData.location.trim() || null,
         description: obraData.description.trim() || null,
+        image_url: obraData.image_url.trim() || null,
         start_date: obraData.start_date || null,
         expected_end_date: obraData.expected_end_date || null,
       });

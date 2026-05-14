@@ -15,6 +15,7 @@ export interface ObraCreatePayload {
   name: string;
   location?: string | null;
   description?: string | null;
+  image_url?: string | null;
   start_date?: string | null;
   expected_end_date?: string | null;
 }

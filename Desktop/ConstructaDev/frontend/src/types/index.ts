@@ -10,6 +10,7 @@ export interface Obra {
   name: string;
   description: string | null;
   location: string | null;
+  image_url: string | null;
   status: ObraStatus;
   manager_id: number;
   start_date: string | null;
@@ -47,7 +48,9 @@ export interface Task {
   responsible_id: number | null;
   estimated_progress: number;
   start_date: string | null;
+  start_time: string | null;
   due_date: string | null;
+  due_time: string | null;
   completed_date: string | null;
   order_index: number;
   depends_on_id: number | null;

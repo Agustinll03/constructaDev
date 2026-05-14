@@ -1,5 +1,5 @@
 import enum
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from sqlalchemy import (
     Date,
     DateTime,
@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -52,7 +53,9 @@ class Task(Base):
     estimated_progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     start_date: Mapped[date | None] = mapped_column(Date)
+    start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     due_date: Mapped[date | None] = mapped_column(Date)
+    due_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     completed_date: Mapped[date | None] = mapped_column(Date)
 
     # Display order for Gantt (Phase 3)

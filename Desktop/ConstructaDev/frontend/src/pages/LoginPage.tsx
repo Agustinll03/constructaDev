@@ -1,17 +1,30 @@
-import { useState, type FormEvent } from "react";
+import React, { useState } from "react";
 import { login } from "../api/auth";
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 
 interface LoginPageProps {
   onLogin: () => void;
 }
 
+const FEATURES = [
+  "Tareas en tiempo real",
+  "Alertas automáticas vía WhatsApp",
+  "Trazabilidad completa de obras",
+];
+
+const blueprintGrid: React.CSSProperties = {
+  backgroundImage: "radial-gradient(circle, rgba(255,107,53,0.18) 1px, transparent 1px)",
+  backgroundSize: "24px 24px",
+};
+
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
@@ -27,109 +40,213 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen flex bg-constructa-bg">
-      {/* Left panel — industrial dark */}
-      <div className="hidden lg:flex w-96 bg-constructa-dark flex-col justify-between p-10 flex-shrink-0">
-        <div>
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 rounded bg-constructa-primary flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9.5L12 4l9 5.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 21V12h6v9" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-lg tracking-tight">CONSTRUCTA</span>
-          </div>
+    <div className="min-h-screen flex bg-white">
 
-          <h2 className="text-3xl font-bold text-white leading-tight mb-4">
-            Gestión de obras<br />
-            <span className="text-constructa-primary">inteligente</span>
-          </h2>
-          <p className="text-white/50 text-sm leading-relaxed">
-            Control en tiempo real de tareas, responsables y alertas en tus proyectos de construcción.
-          </p>
-        </div>
+      {/* ── Left panel ─────────────────────────────────────── */}
+      <div
+        className="hidden lg:flex lg:w-[42%] xl:w-[40%] bg-constructa-dark flex-col justify-between p-10 xl:p-14 relative overflow-hidden flex-shrink-0"
+        style={blueprintGrid}
+      >
+        {/* corner marks */}
+        <span className="absolute top-5 left-5 w-4 h-4 border-t-2 border-l-2 border-constructa-primary/40" />
+        <span className="absolute top-5 right-5 w-4 h-4 border-t-2 border-r-2 border-constructa-primary/40" />
+        <span className="absolute bottom-5 left-5 w-4 h-4 border-b-2 border-l-2 border-constructa-primary/40" />
+        <span className="absolute bottom-5 right-5 w-4 h-4 border-b-2 border-r-2 border-constructa-primary/40" />
 
-        <div className="space-y-3">
-          {["Tareas en tiempo real", "Alertas automáticas", "Trazabilidad completa"].map(
-            (feature) => (
-              <div key={feature} className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-constructa-primary flex-shrink-0" />
-                <span className="text-white/60 text-sm">{feature}</span>
-              </div>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Right panel — form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded bg-constructa-primary flex items-center justify-center">
+        {/* Brand */}
+        <div className="relative z-10 opacity-0 animate-fade-in" style={{ animationDelay: "0.05s" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded bg-constructa-primary flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 9.5L12 4l9 5.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 21V12h6v9" />
               </svg>
             </div>
-            <span className="font-bold text-constructa-text tracking-tight">CONSTRUCTA</span>
+            <span className="text-white font-display font-bold text-lg tracking-tight">CONSTRUCTA</span>
+          </div>
+        </div>
+
+        {/* Headline */}
+        <div className="relative z-10 space-y-5">
+          <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: "0.15s" }}>
+            <div className="flex items-center gap-2 mb-5">
+              <svg className="w-4 h-4 text-constructa-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+              </svg>
+              <span className="font-mono text-[11px] font-semibold tracking-widest text-constructa-primary/80 uppercase">
+                Sistema v.2026
+              </span>
+            </div>
+
+            <h1 className="font-display text-4xl xl:text-5xl font-extrabold text-white leading-[1.1] tracking-tight">
+              Gestioná obras<br />
+              con <span className="text-constructa-primary">precisión.</span>
+            </h1>
           </div>
 
-          <h1 className="text-2xl font-bold text-constructa-text mb-1">Iniciar sesión</h1>
-          <p className="text-sm text-constructa-secondaryText mb-8">
-            Accedé a tu panel de control.
+          <p
+            className="font-sans text-sm text-white/50 leading-relaxed max-w-xs opacity-0 animate-fade-in-up"
+            style={{ animationDelay: "0.28s" }}
+          >
+            El sistema operativo para equipos de construcción. Control total desde cualquier lugar.
           </p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-widest text-constructa-secondaryText mb-1.5">
+        {/* Features */}
+        <div className="relative z-10 space-y-3">
+          {FEATURES.map((feat, i) => (
+            <div
+              key={feat}
+              className="flex items-center gap-3 opacity-0 animate-fade-in-up"
+              style={{ animationDelay: `${0.38 + i * 0.1}s` }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-constructa-primary flex-shrink-0" />
+              <span className="font-mono text-[12px] text-white/60">{feat}</span>
+            </div>
+          ))}
+
+          <div
+            className="pt-5 border-t border-white/10 flex items-center justify-between opacity-0 animate-fade-in"
+            style={{ animationDelay: "0.72s" }}
+          >
+            <span className="font-mono text-[11px] text-white/30 uppercase tracking-widest">
+              Entorno seguro
+            </span>
+            <span className="font-mono text-[11px] text-white/30">AES-256</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right panel ────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-constructa-bg">
+        <div className="w-full max-w-[400px]">
+
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2.5 mb-10 lg:hidden">
+            <div className="w-8 h-8 rounded bg-constructa-primary flex items-center justify-center">
+              <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9.5L12 4l9 5.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 21V12h6v9" />
+              </svg>
+            </div>
+            <span className="font-display font-bold text-constructa-text tracking-tight">CONSTRUCTA</span>
+          </div>
+
+          {/* Heading */}
+          <div
+            className="mb-8 opacity-0 animate-fade-in-up"
+            style={{ animationDelay: "0.1s" }}
+          >
+            <h2 className="font-display text-2xl xl:text-3xl font-bold text-constructa-text tracking-tight mb-1.5">
+              Accedé al sistema
+            </h2>
+            <p className="text-sm text-constructa-secondaryText">
+              Ingresá tus credenciales para continuar.
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+
+            {/* Email */}
+            <div
+              className="opacity-0 animate-fade-in-up"
+              style={{ animationDelay: "0.2s" }}
+            >
+              <label className="block font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-constructa-secondaryText mb-2">
                 Email
               </label>
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-constructa-border bg-white rounded px-3 py-2.5 text-sm text-constructa-text placeholder-constructa-border focus:outline-none focus:ring-2 focus:ring-constructa-primary focus:border-transparent transition"
-                placeholder="manager@constructa.com"
-              />
+              <div className="relative flex items-center bg-white border border-constructa-border rounded-lg focus-within:border-constructa-primary focus-within:ring-2 focus-within:ring-constructa-primary/15 transition-all duration-200">
+                <Mail className="absolute left-3.5 w-4 h-4 text-constructa-border flex-shrink-0" />
+                <input
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="manager@constructa.com"
+                  className="w-full pl-10 pr-4 py-3 bg-transparent text-sm text-constructa-text placeholder-constructa-border focus:outline-none"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-widest text-constructa-secondaryText mb-1.5">
+            {/* Password */}
+            <div
+              className="opacity-0 animate-fade-in-up"
+              style={{ animationDelay: "0.3s" }}
+            >
+              <label className="block font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-constructa-secondaryText mb-2">
                 Contraseña
               </label>
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-constructa-border bg-white rounded px-3 py-2.5 text-sm text-constructa-text placeholder-constructa-border focus:outline-none focus:ring-2 focus:ring-constructa-primary focus:border-transparent transition"
-                placeholder="••••••••"
-              />
+              <div className="relative flex items-center bg-white border border-constructa-border rounded-lg focus-within:border-constructa-primary focus-within:ring-2 focus-within:ring-constructa-primary/15 transition-all duration-200">
+                <Lock className="absolute left-3.5 w-4 h-4 text-constructa-border flex-shrink-0" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••"
+                  className="w-full pl-10 pr-12 py-3 bg-transparent text-sm text-constructa-text placeholder-constructa-border focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3.5 text-constructa-border hover:text-constructa-secondaryText transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
+            {/* Error */}
             {error && (
-              <div className="text-sm text-constructa-danger bg-red-50 border border-constructa-danger/30 rounded px-3 py-2.5">
+              <div className="text-sm text-constructa-danger bg-red-50 border border-constructa-danger/25 rounded-lg px-4 py-3 animate-fade-in">
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-constructa-primary hover:bg-orange-600 text-white font-bold py-3 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-sm uppercase tracking-widest"
+            {/* Submit */}
+            <div
+              className="pt-1 opacity-0 animate-fade-in-up"
+              style={{ animationDelay: "0.4s" }}
             >
-              {loading ? "Ingresando..." : "Ingresar"}
-            </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-constructa-primary hover:bg-orange-600 active:scale-[0.99] text-white font-display font-bold py-3.5 rounded-lg transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-sm uppercase tracking-widest"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Ingresando...
+                  </span>
+                ) : (
+                  <>
+                    Ingresar
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
           </form>
 
-          <p className="text-center text-xs text-constructa-border mt-8">
-            CONSTRUCTA — Proyecto de tesis 2026
-          </p>
+          {/* Footer */}
+          <div
+            className="mt-10 pt-6 border-t border-constructa-surface flex items-center justify-between opacity-0 animate-fade-in"
+            style={{ animationDelay: "0.55s" }}
+          >
+            <span className="font-mono text-[10px] text-constructa-border uppercase tracking-widest">
+              CONSTRUCTA
+            </span>
+            <span className="font-mono text-[10px] text-constructa-border uppercase tracking-widest">
+              Tesis 2026
+            </span>
+          </div>
         </div>
       </div>
     </div>

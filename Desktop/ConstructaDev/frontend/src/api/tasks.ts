@@ -12,7 +12,9 @@ export interface TaskCreatePayload {
   description?: string | null;
   responsible_id?: number | null;
   start_date?: string | null;
+  start_time?: string | null;
   due_date?: string | null;
+  due_time?: string | null;
   order_index?: number;
 }
 
@@ -26,7 +28,9 @@ export interface TaskUpdatePayload {
   description?: string | null;
   responsible_id?: number | null;
   start_date?: string | null;
+  start_time?: string | null;
   due_date?: string | null;
+  due_time?: string | null;
   order_index?: number;
 }
 

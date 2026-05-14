@@ -12,11 +12,11 @@ export default {
           progress:      "#FB8C00",
           danger:        "#E53935",
           info:          "#1E88E5",
-          bg:            "#FAFAFA",
-          surface:       "#ECEFF1",
-          border:        "#B0BEC5",
-          secondaryText: "#607D8B",
-          text:          "#263238",
+          bg:            "#F5F3EF",
+          surface:       "#EAE7E0",
+          border:        "#C8C0B4",
+          secondaryText: "#7A7068",
+          text:          "#1E1A16",
         },
       },
       boxShadow: {
@@ -25,6 +25,24 @@ export default {
       },
       borderRadius: {
         industrial: "4px",
+      },
+      fontFamily: {
+        display: ["Plus Jakarta Sans", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
+      },
+      keyframes: {
+        fadeInUp: {
+          "0%": { opacity: "0", transform: "translateY(18px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+      },
+      animation: {
+        "fade-in-up": "fadeInUp 0.55s ease-out forwards",
+        "fade-in": "fadeIn 0.4s ease-out forwards",
       },
     },
   },

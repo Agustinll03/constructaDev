@@ -74,7 +74,9 @@ export function TaskFormModal({
       : ""
   );
   const [startDate, setStartDate] = useState(task?.start_date ?? "");
+  const [startTime, setStartTime] = useState(task?.start_time?.slice(0, 5) ?? "");
   const [dueDate, setDueDate] = useState(task?.due_date ?? "");
+  const [dueTime, setDueTime] = useState(task?.due_time?.slice(0, 5) ?? "");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -101,7 +103,9 @@ export function TaskFormModal({
         description: description.trim() || null,
         responsible_id: responsibleId ? Number(responsibleId) : null,
         start_date: startDate || null,
+        start_time: startTime || null,
         due_date: dueDate || null,
+        due_time: dueTime || null,
       };
 
       let saved: Task;
@@ -214,29 +218,51 @@ export function TaskFormModal({
             </select>
           </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Dates + Times */}
+          <div className="space-y-3">
             <div>
-              <Label optional>Fecha de inicio</Label>
-              <input
-                type="date"
-                className={inputCls()}
-                value={startDate}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setStartDate(e.target.value)
-                }
-              />
+              <Label optional>Fecha y hora de inicio</Label>
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <input
+                  type="date"
+                  className={inputCls()}
+                  value={startDate}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setStartDate(e.target.value)
+                  }
+                />
+                <input
+                  type="time"
+                  className={[inputCls(), "w-32"].join(" ")}
+                  value={startTime}
+                  disabled={!startDate}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setStartTime(e.target.value)
+                  }
+                />
+              </div>
             </div>
             <div>
-              <Label optional>Fecha de vencimiento</Label>
-              <input
-                type="date"
-                className={inputCls(!!errors.dueDate)}
-                value={dueDate}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setDueDate(e.target.value)
-                }
-              />
+              <Label optional>Fecha y hora de vencimiento</Label>
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <input
+                  type="date"
+                  className={inputCls(!!errors.dueDate)}
+                  value={dueDate}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setDueDate(e.target.value)
+                  }
+                />
+                <input
+                  type="time"
+                  className={[inputCls(!!errors.dueDate), "w-32"].join(" ")}
+                  value={dueTime}
+                  disabled={!dueDate}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setDueTime(e.target.value)
+                  }
+                />
+              </div>
               {errors.dueDate && (
                 <p className="mt-1 text-xs text-constructa-danger">
                   {errors.dueDate}

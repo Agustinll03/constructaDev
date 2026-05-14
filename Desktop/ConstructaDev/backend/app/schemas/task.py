@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from pydantic import BaseModel, Field, model_validator
 from app.models.task import TaskStatus
 
@@ -9,7 +9,9 @@ class TaskCreate(BaseModel):
     description: str | None = None
     responsible_id: int | None = None
     start_date: date | None = None
+    start_time: time | None = None
     due_date: date | None = None
+    due_time: time | None = None
     order_index: int = Field(default=0, ge=0)
     depends_on_id: int | None = None
 
@@ -25,7 +27,9 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     responsible_id: int | None = None
     start_date: date | None = None
+    start_time: time | None = None
     due_date: date | None = None
+    due_time: time | None = None
     order_index: int | None = Field(None, ge=0)
     depends_on_id: int | None = None
 
@@ -45,7 +49,9 @@ class TaskRead(BaseModel):
     responsible_id: int | None
     estimated_progress: int
     start_date: date | None
+    start_time: time | None
     due_date: date | None
+    due_time: time | None
     completed_date: date | None
     order_index: int
     depends_on_id: int | None

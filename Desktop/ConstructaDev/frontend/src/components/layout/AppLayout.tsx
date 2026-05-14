@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { LogOut } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import type { Page } from "../../types";
 
@@ -10,7 +9,6 @@ interface AppLayoutProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
   onLogout: () => void;
-  /** Optional slot rendered in the top-bar right area (e.g. refresh button) */
   topBarRight?: ReactNode;
 }
 
@@ -24,35 +22,37 @@ export function AppLayout({
   topBarRight,
 }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen bg-constructa-bg">
-      {/* Sidebar */}
-      <Sidebar activePage={activePage} onNavigate={onNavigate} />
+    <div className="min-h-screen bg-constructa-bg">
+      <Sidebar activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} />
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="ml-64 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="bg-white border-b border-constructa-border h-14 flex items-center px-6 gap-4 flex-shrink-0">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold text-constructa-text truncate">{pageTitle}</h1>
+        <header className="sticky top-0 z-40 bg-[#F5F3EF] border-b border-constructa-border h-12 flex items-center px-6 gap-4 flex-shrink-0">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-constructa-secondaryText flex-shrink-0">
+            <span className="text-constructa-border">Workspace</span>
+            <span className="text-constructa-border">/</span>
+            <span className="text-constructa-text font-semibold">{pageTitle}</span>
             {pageSubtitle && (
-              <p className="text-xs text-constructa-secondaryText truncate">{pageSubtitle}</p>
+              <>
+                <span className="text-constructa-border">/</span>
+                <span className="text-constructa-secondaryText truncate max-w-[200px]">{pageSubtitle}</span>
+              </>
             )}
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {topBarRight}
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-1.5 text-xs font-medium text-constructa-secondaryText hover:text-constructa-text px-2.5 py-1.5 rounded hover:bg-constructa-surface transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Salir
-            </button>
-          </div>
+          <div className="flex-1" />
+
+          {/* Right slot */}
+          {topBarRight && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {topBarRight}
+            </div>
+          )}
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-7 overflow-y-auto">
           {children}
         </main>
       </div>

@@ -7,11 +7,10 @@ interface SectionTitleProps {
 
 export function SectionTitle({ children, aside }: SectionTitleProps) {
   return (
-    <div className="flex items-center justify-between mb-4">
+    <div className="flex items-center justify-between mb-5">
       <div className="flex items-center gap-3">
-        {/* Left orange accent bar */}
-        <span className="block w-1 h-5 rounded-full bg-constructa-primary flex-shrink-0" />
-        <h2 className="text-sm font-bold uppercase tracking-widest text-constructa-text">
+        <span className="block w-0.5 h-4 rounded-full bg-constructa-primary flex-shrink-0" />
+        <h2 className="text-[11px] font-mono font-bold uppercase tracking-[0.2em] text-constructa-secondaryText">
           {children}
         </h2>
       </div>

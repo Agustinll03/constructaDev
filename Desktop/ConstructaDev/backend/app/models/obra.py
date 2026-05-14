@@ -29,6 +29,7 @@ class Obra(Base):
         default=ObraStatus.PLANIFICADA,
         nullable=False,
     )
+    image_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     start_date: Mapped[date | None] = mapped_column(Date)
     expected_end_date: Mapped[date | None] = mapped_column(Date)
     actual_end_date: Mapped[date | None] = mapped_column(Date)
