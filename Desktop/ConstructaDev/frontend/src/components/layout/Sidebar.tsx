@@ -1,106 +1,293 @@
-import { LayoutDashboard, Settings, LogOut } from "lucide-react";
-import type { Page } from "../../types";
+import { LogOut } from "lucide-react";
+import type { Obra, ObraStatus, Page } from "../../types";
+
+const HERO_DOT_COLORS = ["#FF8856","#3D8BFF","#2AC58A","#B07CF7","#8FA8B5","#E8B14A","#5DA8B5"];
+const STATUS_PCT: Record<ObraStatus, number> = {
+  planificada: 5, en_progreso: 50, pausada: 30, completada: 100, cancelada: 0,
+};
 
 interface SidebarProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
   onLogout: () => void;
+  pinnedObras?: Obra[];
 }
 
-function NavBtn({
+// ─── Nav item ─────────────────────────────────────────────────────────────────
+
+function NavItem({
   label,
-  icon: Icon,
+  icon,
   active = false,
+  disabled = false,
+  count,
+  countOrange,
   onClick,
 }: {
   label: string;
-  icon: React.ElementType;
+  icon: React.ReactNode;
   active?: boolean;
+  disabled?: boolean;
+  count?: number;
+  countOrange?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
-      onClick={onClick}
-      className={[
-        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all text-left",
-        active
-          ? "bg-constructa-primary text-white"
-          : "text-white/50 hover:text-white hover:bg-white/[0.06]",
-      ].join(" ")}
+      onClick={!disabled ? onClick : undefined}
+      disabled={disabled}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 11,
+        padding: "7px 10px",
+        borderRadius: 8,
+        fontSize: 13,
+        fontWeight: 500,
+        textAlign: "left",
+        cursor: disabled ? "default" : "pointer",
+        border: "none",
+        transition: "background 0.12s, color 0.12s",
+        background: active
+          ? "linear-gradient(180deg, rgba(255,107,53,0.18), rgba(255,107,53,0.08))"
+          : "transparent",
+        boxShadow: active ? "inset 0 0 0 1px rgba(255,107,53,0.25)" : "none",
+        color: active ? "#fff" : disabled ? "rgba(207,212,215,0.35)" : "#CFD4D7",
+        opacity: disabled ? 0.5 : 1,
+      }}
+      onMouseEnter={e => {
+        if (!active && !disabled) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+      }}
+      onMouseLeave={e => {
+        if (!active && !disabled) (e.currentTarget as HTMLElement).style.background = "transparent";
+      }}
     >
-      <Icon className="w-4 h-4 flex-shrink-0" />
-      {label}
+      <span style={{ width: 16, display: "inline-flex", justifyContent: "center", color: active ? "#FF6B35" : "inherit", opacity: active ? 1 : 0.65, flexShrink: 0 }}>
+        {icon}
+      </span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {count !== undefined && (
+        <span style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 10.5,
+          padding: "1px 6px",
+          borderRadius: 99,
+          background: countOrange ? "#FF6B35" : "rgba(255,255,255,0.08)",
+          color: countOrange ? "#fff" : "#CFD4D7",
+          flexShrink: 0,
+        }}>
+          {count}
+        </span>
+      )}
     </button>
   );
 }
 
-export function Sidebar({ activePage, onNavigate, onLogout }: SidebarProps) {
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
+export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [] }: SidebarProps) {
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-[#1C2130] flex flex-col z-50">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/[0.07]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-constructa-primary flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9.5L12 4l9 5.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 21V12h6v9" />
-            </svg>
+    <aside style={{
+      position: "fixed",
+      left: 0,
+      top: 0,
+      height: "100vh",
+      width: 260,
+      background: "#2F3A40",
+      display: "flex",
+      flexDirection: "column",
+      padding: "14px 12px 12px",
+      zIndex: 50,
+      overflowY: "auto",
+    }}>
+
+      {/* ── Brand ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 6px 14px" }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+          background: "linear-gradient(160deg, #FF6B35 0%, #E85A26 100%)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px -6px rgba(255,107,53,0.6)",
+        }}>
+          <svg width="16" height="16" viewBox="0 0 22 22" fill="none">
+            <path d="M3 19V8.5L11 3l8 5.5V19H3z" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round"/>
+            <path d="M8 19v-6h5v6" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: "0.04em" }}>
+            CONSTRUCTA
           </div>
-          <div>
-            <p className="text-white font-display font-bold text-sm leading-none tracking-tight">CONSTRUCTA</p>
-            <p className="text-white/40 text-[10px] mt-0.5 font-mono">Gestión de obras</p>
-          </div>
+          <div style={{ fontSize: 11, color: "#8C969C", marginTop: 1 }}>Gestión de obras</div>
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-5 space-y-5 overflow-y-auto">
-        <div>
-          <p className="text-[9px] font-mono uppercase tracking-[0.22em] text-white/25 px-3 mb-2">
-            Workspace
-          </p>
-          <div className="space-y-0.5">
-            <NavBtn
-              label="Panel"
-              icon={LayoutDashboard}
-              active={activePage === "panel"}
-              onClick={() => onNavigate("panel")}
-            />
-          </div>
+      {/* ── Workspace switcher ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 9,
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: 10, padding: "8px 10px",
+        margin: "0 2px 14px", cursor: "pointer",
+        transition: "background 0.15s",
+      }}
+        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
+        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+      >
+        <div style={{
+          width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+          background: "linear-gradient(135deg, #FF8856, #FF6B35)",
+          color: "#fff", fontWeight: 700, fontSize: 11,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+        }}>EV</div>
+        <div style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
+          <div style={{ color: "#fff", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Estudio Velar</div>
+          <div style={{ fontSize: 10.5, color: "#8C969C", letterSpacing: "0.04em" }}>Workspace</div>
         </div>
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ color: "#6B767E", flexShrink: 0 }}>
+          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
 
-        <div>
-          <p className="text-[9px] font-mono uppercase tracking-[0.22em] text-white/25 px-3 mb-2">
-            Cuenta
-          </p>
-          <div className="space-y-0.5">
-            <NavBtn
-              label="Configuración"
-              icon={Settings}
-              active={activePage === "configuracion"}
-              onClick={() => onNavigate("configuracion")}
-            />
-          </div>
-        </div>
+      {/* ── Search ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 9,
+        background: "rgba(0,0,0,0.18)",
+        border: "1px solid rgba(255,255,255,0.05)",
+        borderRadius: 9, padding: "7px 10px",
+        margin: "0 2px 16px", color: "#8C969C",
+        fontSize: 12.5, cursor: "pointer",
+      }}>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+          <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+        <span style={{ flex: 1 }}>Buscar…</span>
+        <kbd style={{
+          fontSize: 10, padding: "1px 6px", borderRadius: 4,
+          background: "rgba(255,255,255,0.05)",
+          color: "#8C969C",
+          border: "1px solid rgba(255,255,255,0.06)",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>⌘K</kbd>
+      </div>
+
+      {/* ── WORKSPACE section ── */}
+      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "8px 10px 6px" }}>
+        Workspace
+      </div>
+      <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        <NavItem
+          label="Panel"
+          active={activePage === "panel"}
+          onClick={() => onNavigate("panel")}
+          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="9" y="9" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none"/></svg>}
+        />
+        <NavItem
+          label="Mis obras"
+          disabled
+          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 13.5V6l5-3.5 5 3.5v7.5h-10z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><path d="M6 13.5V10h3v3.5M5 7.5h5" stroke="currentColor" strokeWidth="1.4"/></svg>}
+        />
+        <NavItem
+          label="Cronograma"
+          disabled
+          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3.5" width="11" height="10" rx="1.4" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M5.5 2v3M10.5 2v3M2.5 7h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+        />
+        <NavItem
+          label="Equipo"
+          disabled
+          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="6" r="2.4" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M2.5 13c.4-2 1.8-3.3 3.5-3.3S9.1 11 9.5 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/><path d="M10.5 4.5a2.2 2.2 0 010 4.3M11.5 9.7c1.5.3 2.5 1.6 2.8 3.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+        />
+        <NavItem
+          label="Documentos"
+          disabled
+          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3.5 2.5h6L13 6v7.5H3.5v-11z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><path d="M9.5 2.5V6H13" stroke="currentColor" strokeWidth="1.4" fill="none"/></svg>}
+        />
+        <NavItem
+          label="Reportes"
+          disabled
+          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 13V8M7 13V4M11 13V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>}
+        />
       </nav>
 
-      {/* User + logout */}
-      <div className="px-3 py-4 border-t border-white/[0.07]">
-        <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
-          <div className="w-8 h-8 rounded-full bg-constructa-primary flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold font-display">PM</span>
+      {/* ── CUENTA section ── */}
+      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
+        Cuenta
+      </div>
+      <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        <NavItem
+          label="Configuración"
+          active={activePage === "configuracion"}
+          onClick={() => onNavigate("configuracion")}
+          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 1.8v1.8M8 12.4v1.8M14.2 8h-1.8M3.6 8H1.8M12.4 3.6l-1.3 1.3M4.9 11.1l-1.3 1.3M12.4 12.4l-1.3-1.3M4.9 4.9L3.6 3.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+        />
+        <NavItem
+          label="Notificaciones"
+          disabled
+          count={3}
+          countOrange
+          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 12V8a5 5 0 0110 0v4M2 12h12M6 14a2 2 0 004 0" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none"/></svg>}
+        />
+      </nav>
+
+      {/* ── Spacer ── */}
+      <div style={{ flex: 1 }} />
+
+      {/* ── Fijadas ── */}
+      {pinnedObras.length > 0 && (
+        <div style={{
+          margin: "0 2px 10px",
+          padding: 10,
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.05)",
+          borderRadius: 11,
+        }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", marginBottom: 8 }}>
+            Fijadas
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-semibold truncate">Project Manager</p>
-            <p className="text-white/35 text-[10px] font-mono truncate">Administrador</p>
-          </div>
+          {pinnedObras.map(obra => (
+            <div
+              key={obra.id}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 4px", fontSize: 12, color: "#CFD4D7", borderRadius: 6, cursor: "pointer" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: 99, background: HERO_DOT_COLORS[obra.id % HERO_DOT_COLORS.length], flexShrink: 0 }} />
+              <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{obra.name}</span>
+              <span style={{ fontSize: 10.5, color: "#8C969C", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>{STATUS_PCT[obra.status]}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── User + logout ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: 8, borderRadius: 10,
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <div style={{
+          width: 30, height: 30, borderRadius: 99, flexShrink: 0,
+          background: "linear-gradient(135deg, #FF8856, #E85A26)",
+          color: "#fff", fontWeight: 700, fontSize: 11,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+        }}>PM</div>
+        <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Project Manager</div>
+          <div style={{ fontSize: 10.5, color: "#8C969C" }}>Administrador</div>
         </div>
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold text-white/30 hover:text-white/60 hover:bg-white/[0.05] transition-all text-left"
+          title="Cerrar sesión"
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#6B767E", padding: 4, display: "flex", alignItems: "center" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "#CFD4D7")}
+          onMouseLeave={e => (e.currentTarget.style.color = "#6B767E")}
         >
-          <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
-          Cerrar sesión
+          <LogOut style={{ width: 14, height: 14 }} />
         </button>
       </div>
     </aside>

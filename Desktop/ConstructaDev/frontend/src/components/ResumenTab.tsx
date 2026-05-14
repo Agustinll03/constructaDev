@@ -1,7 +1,8 @@
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import {
-  AlertTriangle, CheckCircle2, ChevronRight, GripVertical, Pencil,
-  ClipboardList, ArrowRight, Calendar, Activity,
+  AlertTriangle, ChevronRight, GripVertical, Pencil,
+  ArrowRight, Calendar, Activity,
 } from "lucide-react";
 import { GanttTimeline } from "./GanttTimeline";
 import { HistorialPanel } from "./HistorialPanel";
@@ -17,27 +18,40 @@ function isActive(task: Task) {
   return task.status !== "completada" && task.status !== "cancelada";
 }
 
-// ─── Circular progress ────────────────────────────────────────────────────────
+// ─── Progress ring ────────────────────────────────────────────────────────────
 
-function CircularProgress({ pct }: { pct: number }) {
-  const r    = 18;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
-  const strokeColor =
-    pct === 100 ? "text-constructa-success"
-    : pct >= 50  ? "text-constructa-primary"
-    :              "text-constructa-warning";
+const RING_R    = 26;
+const RING_CIRC = 2 * Math.PI * RING_R;
+
+function ProgressRing({ pct }: { pct: number }) {
+  const offset = (1 - pct / 100) * RING_CIRC;
   return (
-    <svg viewBox="0 0 44 44" className="w-9 h-9 -rotate-90">
-      <circle cx="22" cy="22" r={r} fill="none" strokeWidth="3.5" stroke="currentColor" className="text-blue-100" />
-      <circle
-        cx="22" cy="22" r={r}
-        fill="none" strokeWidth="3.5" stroke="currentColor"
-        strokeLinecap="round"
-        strokeDasharray={`${dash} ${circ}`}
-        className={`${strokeColor} transition-all`}
-      />
-    </svg>
+    <div style={{ width: 64, height: 64, position: "relative", flexShrink: 0 }}>
+      <svg width="64" height="64" viewBox="0 0 64 64" style={{ transform: "rotate(-90deg)" }}>
+        <circle cx="32" cy="32" r={RING_R} stroke="#F0F1EF" strokeWidth="7" fill="none"/>
+        <circle
+          cx="32" cy="32" r={RING_R}
+          stroke="url(#kpi-ring-grad)" strokeWidth="7" fill="none"
+          strokeDasharray={RING_CIRC}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+        <defs>
+          <linearGradient id="kpi-ring-grad" x1="0" y1="0" x2="64" y2="64">
+            <stop offset="0%" stopColor="#FF8856"/>
+            <stop offset="100%" stopColor="#E85A26"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div style={{
+        position: "absolute", inset: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "'Plus Jakarta Sans', sans-serif",
+        fontWeight: 700, fontSize: 15, letterSpacing: "-0.02em", color: "#1A2329",
+      }}>
+        {pct}%
+      </div>
+    </div>
   );
 }
 
@@ -111,135 +125,141 @@ export function ResumenTab({
     }
   }
 
+  // ── Distribution bars by status ──────────────────────────────────────────────
+  const statusDist = total === 0 ? null : {
+    completada:  tasks.filter(t => t.status === "completada").length  / total * 100,
+    en_progreso: tasks.filter(t => t.status === "en_progreso").length / total * 100,
+    en_revision: tasks.filter(t => t.status === "en_revision").length / total * 100,
+    pendiente:   tasks.filter(t => t.status === "pendiente").length   / total * 100,
+    bloqueada:   tasks.filter(t => t.status === "bloqueada").length   / total * 100,
+  };
+
   const avgProgressLabel =
-    avgProgress === 0   ? "Inicio del proyecto" :
-    avgProgress === 100 ? "Proyecto completado"  :
-                          "Promedio de todas las tareas";
+    avgProgress === 0   ? "Sin tareas aún" :
+    avgProgress === 100 ? "Proyecto completado" :
+                          `Promedio de ${total} tareas`;
+
+  const kpiTileStyle: CSSProperties = {
+    background: "#fff",
+    border: "1px solid #E6E7E5",
+    borderRadius: 14,
+    padding: "16px 18px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    position: "relative",
+    overflow: "hidden",
+  };
 
   return (
     <div className="space-y-5">
-      {/* ── API error ─────────────────────────────────────────────────────────── */}
+      {/* ── API error ── */}
       {error && (
         <div className="bg-red-50 border border-constructa-danger/30 text-constructa-danger text-sm rounded-xl px-4 py-3">
           {error}
         </div>
       )}
 
-      {/* ── 3 KPI cards ───────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* ── 5-tile KPI strip ── */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr",
+        gap: 14,
+      }}>
 
-        {/* Avance general */}
-        <div className="bg-white border border-constructa-border rounded-2xl shadow-card p-5 flex items-center gap-5">
-          <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-            <CircularProgress pct={avgProgress} />
+        {/* ── KPI 1: Avance general (hero) ── */}
+        <div style={kpiTileStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Avance general</span>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FFF1E9", color: "#FF6B35", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8h3l2-5 3 10 2-5 4-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText">Avance general</p>
-            <p className={[
-              "text-3xl font-bold mt-1",
-              avgProgress === 100 ? "text-constructa-success"
-              : avgProgress >= 50  ? "text-constructa-primary"
-              :                      "text-constructa-text",
-            ].join(" ")}>{avgProgress}%</p>
-            <p className="text-[11px] text-constructa-border mt-0.5">{avgProgressLabel}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <ProgressRing pct={avgProgress} />
+            <div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: "-0.03em", color: "#1A2329", lineHeight: 1 }}>
+                {total} tareas
+              </div>
+              <div style={{ fontSize: 11.5, color: "#5B6770", marginTop: 4 }}>{avgProgressLabel}</div>
+            </div>
           </div>
+          {statusDist && (
+            <div style={{ display: "flex", height: 6, borderRadius: 99, overflow: "hidden", background: "#F0F1EF" }} title="Distribución por estado">
+              {statusDist.completada  > 0 && <span style={{ background: "#1F8A5B", width: statusDist.completada  + "%" }} />}
+              {statusDist.en_progreso > 0 && <span style={{ background: "#E85A26", width: statusDist.en_progreso + "%" }} />}
+              {statusDist.en_revision > 0 && <span style={{ background: "#2A6FDB", width: statusDist.en_revision + "%" }} />}
+              {statusDist.pendiente   > 0 && <span style={{ background: "#E89B14", width: statusDist.pendiente   + "%" }} />}
+              {statusDist.bloqueada   > 0 && <span style={{ background: "#D03A3A", width: statusDist.bloqueada   + "%" }} />}
+            </div>
+          )}
         </div>
 
-        {/* Tareas activas */}
-        <div className="bg-white border border-constructa-border rounded-2xl shadow-card p-5 flex items-center gap-5">
-          <div className="w-14 h-14 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-            <ClipboardList className="w-7 h-7 text-constructa-primary" />
+        {/* ── KPI 2: Tareas activas ── */}
+        <div style={kpiTileStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Tareas activas</span>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#E5EEFB", color: "#2A6FDB", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText">Tareas activas</p>
-            <p className="text-3xl font-bold text-constructa-primary mt-1">{activeCount}</p>
-            <p className="text-[11px] text-constructa-border mt-0.5">de {total} en total</p>
+          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em", color: "#1A2329", lineHeight: 1 }}>
+            {String(activeCount).padStart(2, "0")}
           </div>
+          <div style={{ fontSize: 11.5, color: "#5B6770" }}>de <b style={{ color: "#1A2329" }}>{total}</b> en total</div>
         </div>
 
-        {/* Tareas completadas */}
-        <div className="bg-white border border-constructa-border rounded-2xl shadow-card p-5 flex items-center gap-5">
-          <div className="w-14 h-14 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 className="w-7 h-7 text-constructa-success" />
+        {/* ── KPI 3: Completadas ── */}
+        <div style={kpiTileStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Completadas</span>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#E4F3EC", color: "#1F8A5B", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M5 8.2l2 2 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText">Tareas completadas</p>
-            <p className="text-3xl font-bold text-constructa-success mt-1">{completedCount}</p>
-            <p className="text-[11px] text-constructa-border mt-0.5">de {total} en total</p>
+          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em", color: "#1F8A5B", lineHeight: 1 }}>
+            {String(completedCount).padStart(2, "0")}
           </div>
-        </div>
-      </div>
-
-      {/* ── Alertas + Tareas críticas — compact horizontal cards ─────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-
-        {/* Alertas — compact */}
-        <div className={[
-          "rounded-xl border px-4 py-3 flex items-center gap-4 transition-colors",
-          unreadCount > 0 ? "bg-orange-50 border-orange-200" : "bg-white border-constructa-border",
-        ].join(" ")}>
-          <div className={[
-            "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
-            unreadCount > 0 ? "bg-orange-100" : "bg-green-50",
-          ].join(" ")}>
-            {unreadCount > 0
-              ? <AlertTriangle className="w-5 h-5 text-constructa-warning" />
-              : <CheckCircle2  className="w-5 h-5 text-constructa-success" />
-            }
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText">Alertas activas</p>
-            <p className="text-xs text-constructa-secondaryText mt-0.5 truncate">
-              {unreadCount > 0 ? "La obra requiere atención" : "Sin alertas pendientes"}
-            </p>
-          </div>
-          <p className={[
-            "text-2xl font-bold flex-shrink-0",
-            unreadCount > 0 ? "text-constructa-primary" : "text-constructa-success",
-          ].join(" ")}>{unreadCount}</p>
-          <button
-            onClick={onViewAlerts}
-            className="flex items-center gap-0.5 text-xs font-semibold text-constructa-primary hover:text-constructa-primary/80 transition-colors flex-shrink-0"
-          >
-            Ver alertas
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div style={{ fontSize: 11.5, color: "#5B6770" }}>de <b style={{ color: "#1A2329" }}>{total}</b> en total</div>
         </div>
 
-        {/* Tareas críticas — compact */}
-        <div className={[
-          "rounded-xl border px-4 py-3 flex items-center gap-4 transition-colors",
-          criticalTasks.length > 0 ? "bg-red-50 border-red-200" : "bg-white border-constructa-border",
-        ].join(" ")}>
-          <div className={[
-            "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
-            criticalTasks.length > 0 ? "bg-red-100" : "bg-green-50",
-          ].join(" ")}>
-            {criticalTasks.length > 0
-              ? <AlertTriangle className="w-5 h-5 text-constructa-danger" />
-              : <CheckCircle2  className="w-5 h-5 text-constructa-success" />
-            }
+        {/* ── KPI 4: Alertas activas ── */}
+        <div style={kpiTileStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Alertas activas</span>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FDF1DE", color: "#C97D0E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText">Tareas críticas</p>
-            <p className="text-xs text-constructa-secondaryText mt-0.5 truncate">
-              {criticalTasks.length > 0 ? "Sin responsable asignado" : "No hay tareas críticas"}
-            </p>
+          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em", color: unreadCount > 0 ? "#C97D0E" : "#1A2329", lineHeight: 1 }}>
+            {String(unreadCount).padStart(2, "0")}
           </div>
-          <p className={[
-            "text-2xl font-bold flex-shrink-0",
-            criticalTasks.length > 0 ? "text-constructa-danger" : "text-constructa-success",
-          ].join(" ")}>{criticalTasks.length}</p>
-          {criticalTasks.length > 0 ? (
-            <button
-              onClick={onViewTareas}
-              className="flex items-center gap-0.5 text-xs font-semibold text-constructa-primary hover:text-constructa-primary/80 transition-colors flex-shrink-0"
-            >
-              Ver tareas
-              <ArrowRight className="w-3.5 h-3.5" />
+          {unreadCount > 0 ? (
+            <button onClick={onViewAlerts} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: "#C97D0E", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+              Ver alertas <ArrowRight style={{ width: 11, height: 11 }} />
             </button>
           ) : (
-            <span className="w-[72px] flex-shrink-0" />
+            <div style={{ fontSize: 11.5, color: "#1F8A5B" }}>Sin alertas</div>
+          )}
+        </div>
+
+        {/* ── KPI 5: Tareas críticas ── */}
+        <div style={kpiTileStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Críticas</span>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FCE5E5", color: "#D03A3A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 14c2.5 0 4.5-1.7 4.5-4.4 0-2-1.6-2.9-2.5-3.6.5-2 0-3.5-2-4 .5 2.5-2 4-3.7 5.4-.8.7-1.3 1.6-1.3 2.7C3 12.4 5.4 14 8 14z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/></svg>
+            </div>
+          </div>
+          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em", color: criticalTasks.length > 0 ? "#D03A3A" : "#1A2329", lineHeight: 1 }}>
+            {String(criticalTasks.length).padStart(2, "0")}
+          </div>
+          {criticalTasks.length > 0 ? (
+            <button onClick={onViewTareas} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: "#D03A3A", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+              Ver tareas <ArrowRight style={{ width: 11, height: 11 }} />
+            </button>
+          ) : (
+            <div style={{ fontSize: 11.5, color: "#1F8A5B" }}>Sin tareas críticas</div>
           )}
         </div>
       </div>

@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   Bell,
   Building2,
-  CheckCircle,
-  Clock,
   MessageCircle,
   RefreshCw,
   Send,
   Server,
-  Triangle,
+  Shield,
   Wifi,
-  WifiOff,
-  XCircle,
   Zap,
 } from "lucide-react";
 import socket from "../lib/socket";
@@ -25,114 +22,177 @@ import {
   type SystemSettings,
 } from "../api/settings";
 import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
-import { SectionTitle } from "../components/ui/SectionTitle";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Shared style tokens ──────────────────────────────────────────────────────
 
-type StatusLevel = "ok" | "warning" | "error";
+const C = {
+  good: "#1F8A5B", good50: "#E4F3EC", goodBorder: "#BFE3CE",
+  warn: "#C97D0E", warn50: "#FDF1DE",
+  danger: "#D03A3A", danger50: "#FCE5E5",
+  info: "#2A6FDB", info50: "#E5EEFB",
+  secondary: "#FF6B35", secondary50: "#FFF1E9",
+  text: "#1A2329", text2: "#5B6770", text3: "#8E97A0",
+  line: "#E6E7E5", lineStrong: "#D5D7D3",
+  bg: "#F4F5F4", surface: "#fff",
+  primary: "#2F3A40",
+};
 
-function StatusDot({ level }: { level: StatusLevel }) {
-  const cls = {
-    ok:      "bg-constructa-success",
-    warning: "bg-constructa-warning",
-    error:   "bg-constructa-danger",
-  }[level];
-  return <span className={`inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${cls}`} />;
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatusIcon({ level }: { level: StatusLevel }) {
-  if (level === "ok")      return <CheckCircle className="w-4 h-4 text-constructa-success" />;
-  if (level === "warning") return <Triangle className="w-4 h-4 text-constructa-warning" />;
-  return <XCircle className="w-4 h-4 text-constructa-danger" />;
-}
-
-function Toggle({
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
+function Switch({ checked, onChange, disabled = false }: {
+  checked: boolean; onChange: (v: boolean) => void; disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
-      className={[
-        "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0",
-        checked ? "bg-constructa-success" : "bg-constructa-border",
-        disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
-      ].join(" ")}
+      style={{
+        position: "relative", width: 38, height: 22, borderRadius: 99,
+        background: checked ? C.good : "#D5D7D3",
+        border: "none", cursor: disabled ? "default" : "pointer",
+        transition: ".18s", flexShrink: 0, opacity: disabled ? 0.4 : 1,
+      }}
     >
-      <span
-        className={[
-          "inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform",
-          checked ? "translate-x-[18px]" : "translate-x-[3px]",
-        ].join(" ")}
-      />
+      <span style={{
+        position: "absolute", top: 2, left: checked ? 18 : 2,
+        width: 18, height: 18, borderRadius: 99, background: "#fff",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.04)",
+        transition: ".18s", display: "block",
+      }} />
     </button>
   );
 }
 
-function ToggleRow({
-  label,
-  description,
-  checked,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
+function SectionHead({ id, icon, title, aux }: {
+  id: string; icon: React.ReactNode; title: string; aux?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5 border-b border-constructa-surface last:border-0">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-constructa-text">{label}</p>
-        {description && (
-          <p className="text-xs text-constructa-secondaryText mt-0.5">{description}</p>
-        )}
+    <div id={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "6px 0 14px", scrollMarginTop: 24 }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <span style={{ width: 3, height: 14, borderRadius: 99, background: C.secondary, flexShrink: 0 }} />
+        <span style={{ width: 22, height: 22, borderRadius: 6, background: C.secondary50, color: C.secondary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          {icon}
+        </span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.18em", color: C.text2, textTransform: "uppercase" }}>
+          {title}
+        </span>
       </div>
-      <Toggle checked={checked} onChange={onChange} disabled={disabled} />
+      {aux && <div style={{ fontSize: 12, color: C.text3, display: "flex", alignItems: "center", gap: 8 }}>{aux}</div>}
     </div>
   );
 }
 
-function FieldRow({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  placeholder?: string;
+function Card({ children, style }: { children: React.ReactNode; style?: CSSProperties }) {
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "20px 22px", ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function ToggleRow({ label, description, checked, onChange, disabled = false, icon, iconStyle, first = false }: {
+  label: string; description?: string; checked: boolean;
+  onChange: (v: boolean) => void; disabled?: boolean;
+  icon?: React.ReactNode; iconStyle?: CSSProperties; first?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-semibold text-constructa-secondaryText uppercase tracking-wide">
-        {label}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full border border-constructa-border rounded px-3 py-2 text-sm text-constructa-text placeholder-constructa-border bg-white focus:outline-none focus:ring-1 focus:ring-constructa-primary focus:border-constructa-primary transition-colors"
-      />
+    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderTop: first ? "none" : `1px solid ${C.line}`, paddingTop: first ? 0 : 14 }}>
+      {icon && (
+        <div style={{ width: 32, height: 32, borderRadius: 9, background: "#F4F5F4", color: C.text2, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, ...iconStyle }}>
+          {icon}
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h4 style={{ margin: "0 0 3px", fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 14, color: C.text, letterSpacing: "-0.01em" }}>{label}</h4>
+        {description && <p style={{ margin: 0, fontSize: 12.5, color: C.text2, lineHeight: 1.45 }}>{description}</p>}
+      </div>
+      <Switch checked={checked} onChange={onChange} disabled={disabled} />
     </div>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+function AutoRow({ label, kbd, checked, onChange, disabled = false, icon, first = false }: {
+  label: string; kbd: string; checked: boolean;
+  onChange: (v: boolean) => void; disabled?: boolean;
+  icon: React.ReactNode; first?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderTop: first ? "none" : `1px solid ${C.line}`, paddingTop: first ? 2 : 11 }}>
+      <div style={{ width: 28, height: 28, borderRadius: 8, background: checked ? C.secondary50 : "#F4F5F4", color: checked ? C.secondary : C.text2, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <h4 style={{ margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 13.5, color: C.text }}>{label}</h4>
+      </div>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, padding: "2px 7px", borderRadius: 5, background: "#F4F5F4", color: C.text2, border: `1px solid ${C.line}` }}>{kbd}</span>
+      <Switch checked={checked} onChange={onChange} disabled={disabled} />
+    </div>
+  );
+}
+
+function FieldRow({ label, value, onChange, type = "text", placeholder, icon, hint, required }: {
+  label: string; value: string; onChange: (v: string) => void;
+  type?: string; placeholder?: string; icon?: React.ReactNode; hint?: string; required?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: C.text2, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
+        {label} {required && <span style={{ color: C.secondary }}>*</span>}
+      </label>
+      <div style={{ position: "relative" }}>
+        {icon && (
+          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: C.text3, pointerEvents: "none", display: "flex" }}>
+            {icon}
+          </span>
+        )}
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            height: 38, padding: `0 12px`, paddingLeft: icon ? 34 : 12,
+            border: `1px solid ${focused ? C.secondary : C.line}`,
+            boxShadow: focused ? "0 0 0 4px rgba(255,107,53,0.10)" : "none",
+            background: C.surface, borderRadius: 9, color: C.text,
+            fontSize: 13.5, width: "100%", outline: "none", transition: ".15s",
+          }}
+        />
+      </div>
+      {hint && <div style={{ fontSize: 11.5, color: C.text3 }}>{hint}</div>}
+    </div>
+  );
+}
+
+function SelectRow({ label, value, onChange, children }: {
+  label: string; value: number | string; onChange: (v: string) => void; children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: C.text2, textTransform: "uppercase" }}>{label}</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          height: 38, padding: "0 34px 0 12px", border: `1px solid ${C.line}`,
+          background: C.surface, borderRadius: 9, color: C.text, fontSize: 13.5,
+          width: "100%", outline: "none", appearance: "none", WebkitAppearance: "none",
+          backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16' fill='none'><path d='M4 6l4 4 4-4' stroke='%238E97A0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>")`,
+          backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
+          cursor: "pointer",
+        }}
+      >
+        {children}
+      </select>
+    </div>
+  );
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS: SystemSettings = {
   chatbot_enabled: true,
@@ -155,27 +215,34 @@ const DEFAULT_SETTINGS: SystemSettings = {
   company_phone: null,
 };
 
-export function ConfiguracionPage() {
-  const [form, setForm]         = useState<SystemSettings>(DEFAULT_SETTINGS);
-  const [health, setHealth]     = useState<SystemHealth | null>(null);
-  const [wsConnected, setWsConnected]       = useState(socket.connected);
-  const [lastSync, setLastSync]             = useState<Date | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [saveOk, setSaveOk]     = useState(false);
-  const [dirty, setDirty]       = useState(false);
-  const [healthLoading, setHealthLoading]   = useState(false);
+type StatusLevel = "ok" | "warning" | "error";
 
-  // Test WhatsApp state
+const STATUS_COLORS: Record<StatusLevel, { border: string; iconBg: string; iconColor: string; checkBg: string; checkGlow: string }> = {
+  ok:      { border: C.good,   iconBg: C.good50,   iconColor: C.good,   checkBg: C.good,   checkGlow: C.good50 },
+  warning: { border: C.warn,   iconBg: C.warn50,   iconColor: C.warn,   checkBg: C.warn,   checkGlow: C.warn50 },
+  error:   { border: C.danger, iconBg: C.danger50, iconColor: C.danger, checkBg: C.danger, checkGlow: C.danger50 },
+};
+
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export function ConfiguracionPage() {
+  const [form, setForm]               = useState<SystemSettings>(DEFAULT_SETTINGS);
+  const [health, setHealth]           = useState<SystemHealth | null>(null);
+  const [wsConnected, setWsConnected] = useState(socket.connected);
+  const [lastSync, setLastSync]       = useState<Date | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+  const [saveOk, setSaveOk]           = useState(false);
+  const [dirty, setDirty]             = useState(false);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const savedFormRef = useRef<SystemSettings>(DEFAULT_SETTINGS);
+
   const [testPhone, setTestPhone]     = useState("");
   const [testResult, setTestResult]   = useState<string | null>(null);
   const [testLoading, setTestLoading] = useState(false);
-
-  // Simulate overdue state
-  const [simResult, setSimResult]   = useState<string | null>(null);
-  const [simLoading, setSimLoading] = useState(false);
-
-  // ── Load initial data ────────────────────────────────────────────────────
+  const [simResult, setSimResult]     = useState<string | null>(null);
+  const [simLoading, setSimLoading]   = useState(false);
 
   const loadHealth = useCallback(async () => {
     setHealthLoading(true);
@@ -183,9 +250,7 @@ export function ConfiguracionPage() {
       const h = await fetchSystemHealth();
       setHealth(h);
       setLastSync(new Date());
-    } catch {
-      // silent
-    } finally {
+    } catch { /* silent */ } finally {
       setHealthLoading(false);
     }
   }, []);
@@ -196,41 +261,31 @@ export function ConfiguracionPage() {
       try {
         const [s] = await Promise.all([fetchSettings(), loadHealth()]);
         setForm(s);
-      } catch {
-        // silent — form keeps defaults
-      } finally {
+        savedFormRef.current = s;
+      } catch { /* silent */ } finally {
         setLoading(false);
       }
     })();
   }, [loadHealth]);
-
-  // ── WebSocket status ─────────────────────────────────────────────────────
 
   useEffect(() => {
     function onConnect()    { setWsConnected(true);  setLastSync(new Date()); }
     function onDisconnect() { setWsConnected(false); }
     socket.on("connect",    onConnect);
     socket.on("disconnect", onDisconnect);
-
-    // Connect if needed, then sync current state (connect event won't fire
-    // if the socket was already connected before this component mounted).
-    if (!socket.connected) {
-      socket.connect();
-    } else {
-      setWsConnected(true);
-    }
-    return () => {
-      socket.off("connect",    onConnect);
-      socket.off("disconnect", onDisconnect);
-    };
+    if (!socket.connected) socket.connect(); else setWsConnected(true);
+    return () => { socket.off("connect", onConnect); socket.off("disconnect", onDisconnect); };
   }, []);
 
-  // ── Form helpers ─────────────────────────────────────────────────────────
-
   function set<K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm(prev => ({ ...prev, [key]: value }));
     setDirty(true);
     setSaveOk(false);
+  }
+
+  function handleDiscard() {
+    setForm(savedFormRef.current);
+    setDirty(false);
   }
 
   async function handleSave() {
@@ -238,12 +293,11 @@ export function ConfiguracionPage() {
     try {
       const saved = await patchSettings(form);
       setForm(saved);
+      savedFormRef.current = saved;
       setDirty(false);
       setSaveOk(true);
       setTimeout(() => setSaveOk(false), 3000);
-    } catch {
-      // silent
-    } finally {
+    } catch { /* silent */ } finally {
       setSaving(false);
     }
   }
@@ -267,11 +321,9 @@ export function ConfiguracionPage() {
     setSimResult(null);
     try {
       const res = await simulateOverdue();
-      setSimResult(
-        res.alerts_created > 0
-          ? `Se crearon ${res.alerts_created} alerta${res.alerts_created > 1 ? "s" : ""} de tareas vencidas.`
-          : "No hay tareas vencidas en este momento."
-      );
+      setSimResult(res.alerts_created > 0
+        ? `Se crearon ${res.alerts_created} alerta${res.alerts_created > 1 ? "s" : ""} de tareas vencidas.`
+        : "No hay tareas vencidas en este momento.");
     } catch {
       setSimResult("Error al ejecutar la simulación.");
     } finally {
@@ -281,417 +333,456 @@ export function ConfiguracionPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24 text-constructa-secondaryText text-sm">
-        Cargando configuración...
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "96px 0", color: C.text3, fontSize: 14 }}>
+        Cargando configuración…
       </div>
     );
   }
 
-  // ── Derived status levels ─────────────────────────────────────────────────
+  // ── Derived status levels ──────────────────────────────────────────────────
+  const wsLevel: StatusLevel      = wsConnected ? "ok" : "error";
+  const backendLevel: StatusLevel = health?.backend ? "ok" : "error";
+  const dbLevel: StatusLevel      = health?.database ? "ok" : "error";
+  const waLevel: StatusLevel      = health?.whatsapp_configured ? "ok" : "warning";
+  const allOk = wsLevel === "ok" && backendLevel === "ok" && dbLevel === "ok";
 
-  const wsLevel: StatusLevel        = wsConnected ? "ok" : "error";
-  const backendLevel: StatusLevel   = health?.backend ? "ok" : "error";
-  const dbLevel: StatusLevel        = health?.database ? "ok" : "error";
-  const waLevel: StatusLevel        = health?.whatsapp_configured ? "ok" : "warning";
+  const btnGhost: CSSProperties = {
+    display: "inline-flex", alignItems: "center", gap: 7,
+    padding: "9px 14px", borderRadius: 10,
+    fontSize: 13, fontWeight: 500, cursor: "pointer",
+    background: C.surface, border: `1px solid ${C.line}`, color: C.text,
+    transition: ".15s",
+  };
+  const btnPrimary: CSSProperties = {
+    display: "inline-flex", alignItems: "center", gap: 7,
+    padding: "9px 14px", borderRadius: 10,
+    fontSize: 13, fontWeight: 500, cursor: "pointer",
+    background: C.secondary, color: "#fff", border: "none",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 6px 14px -6px rgba(255,107,53,0.55)",
+  };
 
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-10">
+    <>
+      <style>{`
+        @keyframes ping-green {
+          0%  { box-shadow: 0 0 0 0 rgba(31,138,91,0.45); }
+          70% { box-shadow: 0 0 0 8px rgba(31,138,91,0); }
+          100%{ box-shadow: 0 0 0 0 rgba(31,138,91,0); }
+        }
+        @keyframes ping-orange {
+          0%  { box-shadow: 0 0 0 0 rgba(255,107,53,0.6); }
+          70% { box-shadow: 0 0 0 8px rgba(255,107,53,0); }
+          100%{ box-shadow: 0 0 0 0 rgba(255,107,53,0); }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
 
-      {/* ── Estado del sistema ─────────────────────────────────────────── */}
-      <section>
-        <SectionTitle
-          aside={
-            <button
-              onClick={loadHealth}
-              disabled={healthLoading}
-              className="p-1.5 rounded text-constructa-secondaryText hover:text-constructa-text hover:bg-constructa-surface disabled:opacity-40 transition-colors"
-              title="Verificar estado"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${healthLoading ? "animate-spin" : ""}`} />
-            </button>
-          }
-        >
-          Estado del sistema
-        </SectionTitle>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { icon: <Server className="w-4 h-4" />, label: "Backend", sub: "API online", level: backendLevel },
-            { icon: <Wifi className={`w-4 h-4 ${wsConnected ? "" : "opacity-50"}`} />, label: "WebSocket", sub: wsConnected ? "Conectado" : "Desconectado", level: wsLevel },
-            { icon: <Server className="w-4 h-4" />, label: "Base de datos", sub: health?.database ? "Online" : "Error", level: dbLevel },
-            {
-              icon: <MessageCircle className="w-4 h-4" />,
-              label: "WhatsApp",
-              sub: health?.whatsapp_configured
-                ? (health.whatsapp_number ?? "Configurado")
-                : "Sin configurar",
-              level: waLevel,
-            },
-          ].map(({ icon, label, sub, level }) => (
-            <Card key={label} padding="sm">
-              <div className="flex items-start justify-between gap-2">
-                <div className="text-constructa-secondaryText">{icon}</div>
-                <StatusIcon level={level} />
-              </div>
-              <p className="mt-2 text-sm font-semibold text-constructa-text">{label}</p>
-              <p className="text-xs text-constructa-secondaryText truncate">{sub}</p>
-            </Card>
-          ))}
+      {/* ── Page header ── */}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24, marginBottom: 22 }}>
+        <div>
+          <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 28, fontWeight: 700, color: C.text, margin: 0, letterSpacing: "-0.025em" }}>
+            Configuración
+          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, fontSize: 13.5, color: C.text2 }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: 99, flexShrink: 0,
+              background: allOk ? C.good : C.warn,
+              boxShadow: allOk ? `0 0 0 3px rgba(31,138,91,0.18)` : `0 0 0 3px rgba(201,125,14,0.18)`,
+            }} />
+            <span>
+              {allOk ? "Todos los servicios operativos" : "Algunos servicios necesitan atención"}
+              {lastSync && (
+                <> · última verificación <b style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 500, color: C.text }}>
+                  {lastSync.toLocaleTimeString("es-AR")}
+                </b></>
+              )}
+            </span>
+          </div>
         </div>
-
-        {lastSync && (
-          <p className="text-[11px] text-constructa-border mt-2 flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            Última verificación: {lastSync.toLocaleTimeString("es-AR")}
-          </p>
-        )}
-      </section>
-
-      {/* ── Datos generales ────────────────────────────────────────────── */}
-      <section>
-        <SectionTitle>
-          <span className="flex items-center gap-1.5">
-            <Building2 className="w-4 h-4 text-constructa-secondaryText" />
-            Datos generales
-          </span>
-        </SectionTitle>
-        <Card padding="md">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FieldRow
-              label="Nombre de la empresa"
-              value={form.company_name ?? ""}
-              onChange={(v) => set("company_name", v || null)}
-              placeholder="Constructora XYZ"
-            />
-            <FieldRow
-              label="Responsable principal"
-              value={form.main_responsible ?? ""}
-              onChange={(v) => set("main_responsible", v || null)}
-              placeholder="Juan García"
-            />
-            <FieldRow
-              label="Email de contacto"
-              value={form.company_email ?? ""}
-              onChange={(v) => set("company_email", v || null)}
-              type="email"
-              placeholder="contacto@empresa.com"
-            />
-            <FieldRow
-              label="Teléfono"
-              value={form.company_phone ?? ""}
-              onChange={(v) => set("company_phone", v || null)}
-              placeholder="+54 9 11 1234-5678"
-            />
-          </div>
-        </Card>
-      </section>
-
-      {/* ── Chatbot ────────────────────────────────────────────────────── */}
-      <section>
-        <SectionTitle>
-          <span className="flex items-center gap-1.5">
-            <MessageCircle className="w-4 h-4 text-constructa-secondaryText" />
-            Configuración del Chatbot
-          </span>
-        </SectionTitle>
-        <Card padding="md">
-          {/* WhatsApp number display */}
-          {health?.whatsapp_number && (
-            <div className="flex items-center gap-2 mb-4 p-2.5 rounded bg-green-50 border border-green-200">
-              <StatusDot level="ok" />
-              <span className="text-xs text-green-800 font-medium">
-                Número conectado: <span className="font-bold">{health.whatsapp_number}</span>
-              </span>
-            </div>
-          )}
-          {!health?.whatsapp_configured && (
-            <div className="flex items-center gap-2 mb-4 p-2.5 rounded bg-amber-50 border border-amber-200">
-              <StatusDot level="warning" />
-              <span className="text-xs text-amber-800 font-medium">
-                WhatsApp no configurado. Completá las variables TWILIO_* en el servidor.
-              </span>
-            </div>
-          )}
-
-          <ToggleRow
-            label="Chatbot habilitado"
-            description="Activa o desactiva el procesamiento de mensajes entrantes"
-            checked={form.chatbot_enabled}
-            onChange={(v) => set("chatbot_enabled", v)}
-          />
-          <ToggleRow
-            label="Recordatorios automáticos"
-            description="Envía recordatorios proactivos antes del vencimiento"
-            checked={form.auto_reminders}
-            onChange={(v) => set("auto_reminders", v)}
-            disabled={!form.chatbot_enabled}
-          />
-
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-constructa-secondaryText uppercase tracking-wide">
-                Horario desde
-              </label>
-              <select
-                value={form.send_hour_from}
-                onChange={(e) => set("send_hour_from", Number(e.target.value))}
-                className="border border-constructa-border rounded px-3 py-2 text-sm text-constructa-text bg-white focus:outline-none focus:ring-1 focus:ring-constructa-primary"
-              >
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-constructa-secondaryText uppercase tracking-wide">
-                Horario hasta
-              </label>
-              <select
-                value={form.send_hour_to}
-                onChange={(e) => set("send_hour_to", Number(e.target.value))}
-                className="border border-constructa-border rounded px-3 py-2 text-sm text-constructa-text bg-white focus:outline-none focus:ring-1 focus:ring-constructa-primary"
-              >
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-constructa-secondaryText uppercase tracking-wide">
-                Tiempo máx. sin respuesta
-              </label>
-              <select
-                value={form.max_response_hours}
-                onChange={(e) => set("max_response_hours", Number(e.target.value))}
-                className="border border-constructa-border rounded px-3 py-2 text-sm text-constructa-text bg-white focus:outline-none focus:ring-1 focus:ring-constructa-primary"
-              >
-                {[6, 12, 24, 48, 72].map((h) => (
-                  <option key={h} value={h}>{h} horas</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </Card>
-      </section>
-
-      {/* ── Automatizaciones + Alertas (2-col en desktop) ──────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-
-        {/* Automatizaciones */}
-        <section>
-          <SectionTitle>
-            <span className="flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-constructa-secondaryText" />
-              Automatizaciones
-            </span>
-          </SectionTitle>
-          <Card padding="md">
-            <ToggleRow
-              label="Recordatorio 3 días antes"
-              checked={form.reminder_3days}
-              onChange={(v) => set("reminder_3days", v)}
-              disabled={!form.auto_reminders}
-            />
-            <ToggleRow
-              label="Recordatorio 1 día antes"
-              checked={form.reminder_1day}
-              onChange={(v) => set("reminder_1day", v)}
-              disabled={!form.auto_reminders}
-            />
-            <ToggleRow
-              label="Alertar tareas vencidas"
-              checked={form.alert_overdue}
-              onChange={(v) => set("alert_overdue", v)}
-            />
-            <ToggleRow
-              label="Alertar sin respuesta"
-              checked={form.alert_no_response}
-              onChange={(v) => set("alert_no_response", v)}
-            />
-            <ToggleRow
-              label="Reintentar envío fallido"
-              checked={form.retry_failed}
-              onChange={(v) => set("retry_failed", v)}
-            />
-          </Card>
-        </section>
-
-        {/* Alertas */}
-        <section>
-          <SectionTitle>
-            <span className="flex items-center gap-1.5">
-              <Bell className="w-4 h-4 text-constructa-secondaryText" />
-              Configuración de Alertas
-            </span>
-          </SectionTitle>
-          <Card padding="md">
-            <ToggleRow
-              label="Tarea vencida"
-              description="Mostrar alerta cuando una tarea pasa su fecha límite"
-              checked={form.notify_task_overdue}
-              onChange={(v) => set("notify_task_overdue", v)}
-            />
-            <ToggleRow
-              label="Tarea demorada / bloqueada"
-              description="Mostrar alerta cuando se marca una tarea como demorada"
-              checked={form.notify_task_blocked}
-              onChange={(v) => set("notify_task_blocked", v)}
-            />
-            <ToggleRow
-              label="Responsable sin respuesta"
-              description="Mostrar alerta si no hay respuesta tras el tiempo máximo"
-              checked={form.notify_no_response}
-              onChange={(v) => set("notify_no_response", v)}
-            />
-            <ToggleRow
-              label="Fecha reprogramada"
-              description="Mostrar alerta cuando se reprograma una tarea vía WhatsApp"
-              checked={form.notify_rescheduled}
-              onChange={(v) => set("notify_rescheduled", v)}
-            />
-          </Card>
-        </section>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={loadHealth} disabled={healthLoading} style={{ ...btnGhost, opacity: healthLoading ? 0.6 : 1 }}>
+            <RefreshCw size={13} style={{ animation: healthLoading ? "spin 1s linear infinite" : "none" }} />
+            Verificar ahora
+          </button>
+          <button onClick={handleSave} disabled={saving || !dirty} style={{ ...btnPrimary, opacity: saving || !dirty ? 0.6 : 1 }}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 3.5C3 2.9 3.4 2.5 4 2.5h7l2 2v8a1 1 0 01-1 1H4a1 1 0 01-1-1v-9z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><path d="M5 2.5v3.5h5V2.5M5 13.5V9h6v4.5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/></svg>
+            {saving ? "Guardando…" : saveOk ? "¡Guardado!" : "Guardar cambios"}
+          </button>
+        </div>
       </div>
 
-      {/* ── Tiempo Real ────────────────────────────────────────────────── */}
-      <section>
-        <SectionTitle>
-          <span className="flex items-center gap-1.5">
-            {wsConnected
-              ? <Wifi className="w-4 h-4 text-constructa-secondaryText" />
-              : <WifiOff className="w-4 h-4 text-constructa-secondaryText" />
+
+          {/* ═══ ESTADO DEL SISTEMA ═══ */}
+          <SectionHead
+            id="sistema"
+            icon={<Server size={12} />}
+            title="Estado del sistema"
+            aux={
+              <>
+                <span>
+                  {lastSync ? <>Última verificación · <span style={{ fontFamily: "'JetBrains Mono', monospace", color: C.text2 }}>{lastSync.toLocaleTimeString("es-AR")}</span></> : "Sin verificar"}
+                </span>
+                <button
+                  onClick={loadHealth}
+                  disabled={healthLoading}
+                  style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.line}`, background: C.surface, color: C.text2, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                >
+                  <RefreshCw size={13} style={{ animation: healthLoading ? "spin 1s linear infinite" : "none" }} />
+                </button>
+              </>
             }
-            Tiempo Real
-          </span>
-        </SectionTitle>
-        <Card padding="md">
-          <div className="flex items-center justify-between py-2.5 border-b border-constructa-surface">
-            <div>
-              <p className="text-sm font-medium text-constructa-text">Estado WebSocket</p>
-              <p className="text-xs text-constructa-secondaryText mt-0.5">
-                Canal de actualización en tiempo real
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusDot level={wsLevel} />
-              <span className={`text-xs font-semibold ${wsConnected ? "text-constructa-success" : "text-constructa-danger"}`}>
-                {wsConnected ? "Conectado" : "Desconectado"}
-              </span>
-            </div>
+          />
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 18 }}>
+            {[
+              { icon: <Server size={15} />, label: "Backend",        meta: `API online`,            footer: ["latencia", health?.backend ? "OK" : "—"],    level: backendLevel },
+              { icon: <Wifi size={15} />,   label: "WebSocket",      meta: wsConnected ? "Canal en vivo conectado" : "Desconectado", footer: ["estado", wsConnected ? "activo" : "inactivo"], level: wsLevel },
+              { icon: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5.2" ry="1.8" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M2.8 4v8c0 1 2.3 1.8 5.2 1.8s5.2-.8 5.2-1.8V4M2.8 8c0 1 2.3 1.8 5.2 1.8s5.2-.8 5.2-1.8" stroke="currentColor" strokeWidth="1.4" fill="none"/></svg>, label: "Base de datos", meta: "PostgreSQL online",    footer: ["estado", health?.database ? "online" : "error"], level: dbLevel },
+              { icon: <MessageCircle size={15} />, label: "WhatsApp", meta: health?.whatsapp_number ?? "Sin configurar", footer: ["número", health?.whatsapp_configured ? "activo" : "—"], level: waLevel },
+            ].map(({ icon, label, meta, footer, level }) => {
+              const sc = STATUS_COLORS[level];
+              return (
+                <div key={label} style={{
+                  background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14,
+                  padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8,
+                  position: "relative", overflow: "hidden",
+                }}>
+                  <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: sc.border }} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ width: 30, height: 30, borderRadius: 8, background: sc.iconBg, color: sc.iconColor, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {icon}
+                    </span>
+                    <span style={{ width: 20, height: 20, borderRadius: 99, background: sc.checkBg, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 3px ${sc.checkGlow}` }}>
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </span>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 14.5, color: C.text }}>{label}</div>
+                    <div style={{ fontSize: 11.5, color: C.text2, marginTop: 1, fontFamily: label === "WhatsApp" ? "'JetBrains Mono', monospace" : "inherit", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, fontSize: 10.5, color: C.text3, borderTop: `1px solid ${C.line}`, paddingTop: 8 }}>
+                    <span>{footer[0]}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", color: C.text2 }}>{footer[1]}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="flex items-center justify-between py-2.5 border-b border-constructa-surface">
-            <div>
-              <p className="text-sm font-medium text-constructa-text">Actualización automática</p>
-              <p className="text-xs text-constructa-secondaryText mt-0.5">
-                El panel se actualiza cuando el chatbot modifica una tarea
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusDot level={wsConnected ? "ok" : "warning"} />
-              <span className="text-xs font-semibold text-constructa-secondaryText">
-                {wsConnected ? "Habilitada" : "Inactiva"}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between py-2.5">
-            <p className="text-sm font-medium text-constructa-text">Última sincronización</p>
-            <span className="text-xs text-constructa-secondaryText">
-              {lastSync ? lastSync.toLocaleTimeString("es-AR") : "—"}
-            </span>
-          </div>
-        </Card>
-      </section>
-
-      {/* ── Acciones de testing ────────────────────────────────────────── */}
-      <section>
-        <SectionTitle>Acciones de testing</SectionTitle>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-          {/* Test WhatsApp */}
-          <Card padding="md">
-            <div className="flex items-center gap-2 mb-3">
-              <Send className="w-4 h-4 text-constructa-primary flex-shrink-0" />
-              <p className="text-sm font-semibold text-constructa-text">Probar mensaje WhatsApp</p>
-            </div>
-            <p className="text-xs text-constructa-secondaryText mb-3">
-              Envía un mensaje de prueba al número indicado para verificar la integración con Twilio.
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="tel"
-                value={testPhone}
-                onChange={(e) => { setTestPhone(e.target.value); setTestResult(null); }}
-                placeholder="+54 9 11 1234-5678"
-                className="flex-1 min-w-0 border border-constructa-border rounded px-3 py-1.5 text-sm text-constructa-text placeholder-constructa-border bg-white focus:outline-none focus:ring-1 focus:ring-constructa-primary"
+{/* ═══ DATOS GENERALES ═══ */}
+          <SectionHead id="empresa" icon={<Building2 size={12} />} title="Datos generales"
+            aux={<span>Información de la empresa en avisos y reportes</span>}
+          />
+          <Card style={{ marginBottom: 28 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px" }}>
+              <FieldRow
+                label="Nombre de la empresa" required
+                value={form.company_name ?? ""}
+                onChange={v => set("company_name", v || null)}
+                placeholder="Constructora XYZ"
+                icon={<Building2 size={14} />}
               />
-              <Button
-                variant="primary"
-                onClick={handleTestWhatsApp}
-                disabled={testLoading || !testPhone.trim()}
-                className="text-xs px-3 py-1.5 flex-shrink-0"
-              >
-                {testLoading ? "Enviando..." : "Enviar"}
-              </Button>
+              <FieldRow
+                label="Responsable principal" required
+                value={form.main_responsible ?? ""}
+                onChange={v => set("main_responsible", v || null)}
+                placeholder="Juan García"
+                icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M3 13.5c.6-2.3 2.6-3.8 5-3.8s4.4 1.5 5 3.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+              />
+              <FieldRow
+                label="Email de contacto"
+                value={form.company_email ?? ""}
+                onChange={v => set("company_email", v || null)}
+                type="email"
+                placeholder="contacto@empresa.com"
+                icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.4" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M2.5 5.5L8 9l5.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                hint="Usado para reportes semanales y alertas críticas."
+              />
+              <FieldRow
+                label="Teléfono"
+                value={form.company_phone ?? ""}
+                onChange={v => set("company_phone", v || null)}
+                placeholder="+54 9 11 1234-5678"
+                icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 4c0-.8.6-1.5 1.4-1.5h1.4c.6 0 1.1.4 1.3 1l.4 1.5c.1.5-.1 1-.5 1.3l-.7.5c.9 1.8 2.4 3.3 4.2 4.2l.5-.7c.3-.4.8-.6 1.3-.5l1.5.4c.6.2 1 .7 1 1.3v1.4c0 .8-.7 1.4-1.5 1.4C7 13.3 2.7 9 3 4z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/></svg>}
+              />
             </div>
-            {testResult && (
-              <p className={`text-xs mt-2 font-medium ${testResult.includes("correctamente") ? "text-constructa-success" : "text-constructa-danger"}`}>
-                {testResult}
+          </Card>
+
+          {/* ═══ CHATBOT WHATSAPP ═══ */}
+          <SectionHead id="chatbot" icon={<MessageCircle size={12} />} title="Chatbot WhatsApp"
+            aux={<span>Procesamiento automático de mensajes entrantes</span>}
+          />
+          <Card style={{ marginBottom: 28 }}>
+            {/* WhatsApp banner */}
+            {health?.whatsapp_configured ? (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 12,
+                background: "linear-gradient(180deg, #ECF7F1, #E4F3EC)",
+                border: `1px solid ${C.goodBorder}`,
+                borderRadius: 11, padding: "12px 14px", marginBottom: 18,
+              }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: "#fff", color: C.good, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 1px ${C.goodBorder}`, flexShrink: 0 }}>
+                  <MessageCircle size={18} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: "#0E5A37", fontWeight: 500 }}>
+                    Número conectado
+                    {health.whatsapp_number && (
+                      <b style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, color: "#0E5A37", background: "#fff", padding: "1px 7px", borderRadius: 5, marginLeft: 6, boxShadow: `0 0 0 1px ${C.goodBorder}` }}>
+                        {health.whatsapp_number}
+                      </b>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.good, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 99, background: C.good, flexShrink: 0, animation: "ping-green 1.8s ease-out infinite" }} />
+                    Recibiendo y enviando mensajes correctamente
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button style={{ padding: "6px 11px", fontSize: 12, borderRadius: 8, background: "#fff", border: `1px solid ${C.goodBorder}`, color: "#0E5A37", cursor: "pointer" }}>Reconectar</button>
+                  <button style={{ padding: "6px 11px", fontSize: 12, borderRadius: 8, background: "#fff", border: `1px solid ${C.goodBorder}`, color: "#0E5A37", cursor: "pointer" }}>Ver registros</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.warn50, border: `1px solid #F0D5A0`, borderRadius: 11, padding: "12px 14px", marginBottom: 18 }}>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" style={{ color: C.warn, flexShrink: 0 }}><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                <span style={{ fontSize: 12.5, color: "#9A5D08", fontWeight: 500 }}>WhatsApp no configurado. Completá las variables TWILIO_* en el servidor.</span>
+              </div>
+            )}
+
+            <ToggleRow first
+              label="Chatbot habilitado"
+              description="Activa o desactiva el procesamiento de mensajes entrantes desde WhatsApp."
+              checked={form.chatbot_enabled}
+              onChange={v => set("chatbot_enabled", v)}
+              icon={<MessageCircle size={15} />}
+            />
+            <ToggleRow
+              label="Recordatorios automáticos"
+              description="Envía recordatorios proactivos a los responsables antes del vencimiento de sus tareas."
+              checked={form.auto_reminders}
+              onChange={v => set("auto_reminders", v)}
+              disabled={!form.chatbot_enabled}
+              icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+            />
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, paddingTop: 16, marginTop: 8, borderTop: `1px solid ${C.line}` }}>
+              <SelectRow label="Horario desde" value={form.send_hour_from} onChange={v => set("send_hour_from", Number(v))}>
+                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>)}
+              </SelectRow>
+              <SelectRow label="Horario hasta" value={form.send_hour_to} onChange={v => set("send_hour_to", Number(v))}>
+                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>)}
+              </SelectRow>
+              <SelectRow label="Tiempo máx. sin respuesta" value={form.max_response_hours} onChange={v => set("max_response_hours", Number(v))}>
+                {[6, 12, 24, 48, 72].map(h => <option key={h} value={h}>{h} horas</option>)}
+              </SelectRow>
+            </div>
+          </Card>
+
+          {/* ═══ AUTOMATIZACIONES + ALERTAS (2-col) ═══ */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 28 }}>
+
+            {/* Automatizaciones */}
+            <div>
+              <SectionHead id="automatizaciones" icon={<Zap size={12} />} title="Automatizaciones" />
+              <Card>
+                <div>
+                  <AutoRow first label="Recordatorio 3 días antes" kbd="+3d"
+                    checked={form.reminder_3days} onChange={v => set("reminder_3days", v)}
+                    disabled={!form.auto_reminders}
+                    icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                  />
+                  <AutoRow label="Recordatorio 1 día antes" kbd="+1d"
+                    checked={form.reminder_1day} onChange={v => set("reminder_1day", v)}
+                    disabled={!form.auto_reminders}
+                    icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                  />
+                  <AutoRow label="Alertar tareas vencidas" kbd="−0d"
+                    checked={form.alert_overdue} onChange={v => set("alert_overdue", v)}
+                    icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>}
+                  />
+                  <AutoRow label="Alertar sin respuesta" kbd="24h"
+                    checked={form.alert_no_response} onChange={v => set("alert_no_response", v)}
+                    icon={<Bell size={13} />}
+                  />
+                  <AutoRow label="Reintentar envío fallido" kbd="×3"
+                    checked={form.retry_failed} onChange={v => set("retry_failed", v)}
+                    icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13 8a5 5 0 11-1.5-3.5L13 6M13 3v3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+                  />
+                </div>
+              </Card>
+            </div>
+
+            {/* Alertas */}
+            <div>
+              <SectionHead id="alertas" icon={<Bell size={12} />} title="Configuración de alertas" />
+              <Card>
+                <ToggleRow first
+                  label="Tarea vencida"
+                  description="Mostrar alerta cuando una tarea pasa su fecha límite."
+                  checked={form.notify_task_overdue} onChange={v => set("notify_task_overdue", v)}
+                  icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>}
+                  iconStyle={{ background: C.danger50, color: C.danger }}
+                />
+                <ToggleRow
+                  label="Tarea demorada / bloqueada"
+                  description="Mostrar alerta cuando se marca una tarea como demorada o bloqueada."
+                  checked={form.notify_task_blocked} onChange={v => set("notify_task_blocked", v)}
+                  icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                  iconStyle={{ background: C.warn50, color: C.warn }}
+                />
+                <ToggleRow
+                  label="Responsable sin respuesta"
+                  description="Mostrar alerta si no hay respuesta tras el tiempo máximo configurado."
+                  checked={form.notify_no_response} onChange={v => set("notify_no_response", v)}
+                  icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M3 13.5c.6-2.3 2.6-3.8 5-3.8s4.4 1.5 5 3.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                  iconStyle={{ background: C.info50, color: C.info }}
+                />
+                <ToggleRow
+                  label="Fecha reprogramada"
+                  description="Mostrar alerta cuando se reprograma una tarea vía WhatsApp."
+                  checked={form.notify_rescheduled} onChange={v => set("notify_rescheduled", v)}
+                  icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3.5" width="11" height="10" rx="1.4" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M5.5 2v3M10.5 2v3M2.5 7h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+                  iconStyle={{ background: C.secondary50, color: C.secondary }}
+                />
+              </Card>
+            </div>
+          </div>
+
+          {/* ═══ TIEMPO REAL ═══ */}
+          <SectionHead id="tiempo-real" icon={<Wifi size={12} />} title="Tiempo real"
+            aux={<span>Sincronización en vivo con el chatbot y el backend</span>}
+          />
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "6px 22px", marginBottom: 28 }}>
+            {[
+              {
+                icon: <Wifi size={16} />, iconStyle: { background: C.info50, color: C.info },
+                title: "Estado WebSocket", sub: "Canal de actualización en tiempo real con el servidor.",
+                status: wsConnected ? "Conectado" : "Desconectado", statusOk: wsConnected,
+              },
+              {
+                icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 6h6m4 4H7M9 4l-4 2 4 2M7 12l4-2-4-2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>,
+                iconStyle: { background: C.secondary50, color: C.secondary },
+                title: "Actualización automática", sub: "El panel se actualiza cuando el chatbot modifica una tarea.",
+                status: wsConnected ? "Habilitada" : "Inactiva", statusOk: wsConnected,
+              },
+            ].map(({ icon, iconStyle, title, sub, status, statusOk }, i) => (
+              <div key={title} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderTop: i === 0 ? "none" : `1px solid ${C.line}` }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, ...iconStyle }}>
+                  {icon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h4 style={{ margin: "0 0 2px", fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 14, color: C.text }}>{title}</h4>
+                  <p style={{ margin: 0, fontSize: 12.5, color: C.text2 }}>{sub}</p>
+                </div>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                  padding: "5px 11px", borderRadius: 99, fontSize: 12, fontWeight: 600,
+                  background: statusOk ? C.good50 : "#F4F5F4",
+                  color: statusOk ? "#0E5A37" : C.text2,
+                  border: `1px solid ${statusOk ? C.goodBorder : C.line}`,
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 99, background: statusOk ? C.good : C.text3, flexShrink: 0, animation: statusOk ? "ping-green 1.8s ease-out infinite" : "none" }} />
+                  {status}
+                </span>
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderTop: `1px solid ${C.line}` }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: "#F4F5F4", color: C.text2, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <h4 style={{ margin: "0 0 2px", fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 14, color: C.text }}>Última sincronización</h4>
+                <p style={{ margin: 0, fontSize: 12.5, color: C.text2 }}>Momento de la última lectura recibida desde el servidor.</p>
+              </div>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: C.text, fontWeight: 500 }}>
+                {lastSync ? lastSync.toLocaleTimeString("es-AR") : "—"}
+              </span>
+            </div>
+          </div>
+
+          {/* ═══ HERRAMIENTAS DE TESTING ═══ */}
+          <SectionHead id="herramientas" icon={<Shield size={12} />} title="Herramientas"
+            aux={<span>Acciones de testing y diagnóstico</span>}
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+
+            {/* Test WhatsApp */}
+            <Card>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: C.secondary50, color: C.secondary, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Send size={14} />
+                </div>
+                <p style={{ margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 14, color: C.text }}>Probar mensaje WhatsApp</p>
+              </div>
+              <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.text2 }}>
+                Envía un mensaje de prueba al número indicado para verificar la integración con Twilio.
               </p>
-            )}
-          </Card>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="tel"
+                  value={testPhone}
+                  onChange={e => { setTestPhone(e.target.value); setTestResult(null); }}
+                  placeholder="+54 9 11 1234-5678"
+                  style={{ flex: 1, minWidth: 0, height: 36, padding: "0 12px", border: `1px solid ${C.line}`, borderRadius: 9, fontSize: 13, color: C.text, outline: "none", background: C.surface }}
+                />
+                <Button variant="primary" onClick={handleTestWhatsApp} disabled={testLoading || !testPhone.trim()} className="text-xs px-3 py-1.5 flex-shrink-0">
+                  {testLoading ? "Enviando…" : "Enviar"}
+                </Button>
+              </div>
+              {testResult && (
+                <p style={{ margin: "8px 0 0", fontSize: 12, fontWeight: 500, color: testResult.includes("correctamente") ? C.good : C.danger }}>
+                  {testResult}
+                </p>
+              )}
+            </Card>
 
-          {/* Simulate overdue */}
-          <Card padding="md">
-            <div className="flex items-center gap-2 mb-3">
-              <Bell className="w-4 h-4 text-constructa-warning flex-shrink-0" />
-              <p className="text-sm font-semibold text-constructa-text">Simular tarea vencida</p>
+            {/* Simulate overdue */}
+            <Card>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: C.warn50, color: C.warn, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Bell size={14} />
+                </div>
+                <p style={{ margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 14, color: C.text }}>Simular tarea vencida</p>
+              </div>
+              <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.text2 }}>
+                Fuerza la generación de alertas para todas las tareas que ya superaron su fecha de vencimiento.
+              </p>
+              <Button variant="warning" onClick={handleSimulateOverdue} disabled={simLoading} className="text-xs px-3 py-1.5 w-full">
+                {simLoading ? "Procesando…" : "Ejecutar simulación"}
+              </Button>
+              {simResult && (
+                <p style={{ margin: "8px 0 0", fontSize: 12, fontWeight: 500, color: C.text2 }}>{simResult}</p>
+              )}
+            </Card>
+          </div>
+
+          {/* ═══ SAVE BAR ═══ */}
+          {dirty && (
+            <div style={{
+              position: "sticky", bottom: 18, zIndex: 4, marginTop: 24,
+              background: C.primary, color: "#fff", borderRadius: 14,
+              padding: "11px 14px 11px 18px",
+              display: "flex", alignItems: "center", gap: 14,
+              boxShadow: "0 12px 28px -10px rgba(24,34,42,0.35)",
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: 99, background: C.secondary, flexShrink: 0, animation: "ping-orange 1.6s ease-out infinite" }} />
+              <div style={{ fontSize: 13, fontWeight: 500 }}>
+                <b style={{ color: "#fff" }}>Tenés cambios sin guardar</b>
+                <span style={{ color: "#9BA3AB", fontWeight: 400, marginLeft: 6 }}>Campos de configuración modificados</span>
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                <button onClick={handleDiscard} style={{ padding: "6px 11px", fontSize: 12, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "#fff", cursor: "pointer" }}>
+                  Descartar
+                </button>
+                <button onClick={handleSave} disabled={saving} style={{ padding: "6px 11px", fontSize: 12, borderRadius: 8, background: C.secondary, border: "none", color: "#fff", cursor: "pointer", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 4px 10px -4px rgba(255,107,53,0.55)", opacity: saving ? 0.7 : 1 }}>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ display: "inline", verticalAlign: "-1px", marginRight: 5 }}><path d="M3 3.5C3 2.9 3.4 2.5 4 2.5h7l2 2v8a1 1 0 01-1 1H4a1 1 0 01-1-1v-9z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><path d="M5 2.5v3.5h5V2.5M5 13.5V9h6v4.5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/></svg>
+                  {saving ? "Guardando…" : "Guardar cambios"}
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-constructa-secondaryText mb-3">
-              Fuerza la generación de alertas para todas las tareas que ya superaron su fecha de vencimiento.
-            </p>
-            <Button
-              variant="warning"
-              onClick={handleSimulateOverdue}
-              disabled={simLoading}
-              className="text-xs px-3 py-1.5 w-full"
-            >
-              {simLoading ? "Procesando..." : "Ejecutar simulación"}
-            </Button>
-            {simResult && (
-              <p className="text-xs mt-2 font-medium text-constructa-secondaryText">{simResult}</p>
-            )}
-          </Card>
-        </div>
-      </section>
-
-      {/* ── Save bar ───────────────────────────────────────────────────── */}
-      <div
-        className={[
-          "sticky bottom-4 flex items-center justify-between gap-4 px-4 py-3 rounded-lg border shadow-card-md transition-all",
-          dirty
-            ? "bg-white border-constructa-border opacity-100 translate-y-0"
-            : "bg-white border-transparent opacity-0 pointer-events-none translate-y-2",
-        ].join(" ")}
-      >
-        <p className="text-sm text-constructa-secondaryText">Tenés cambios sin guardar.</p>
-        <div className="flex items-center gap-2">
-          {saveOk && (
-            <span className="text-xs font-semibold text-constructa-success flex items-center gap-1">
-              <CheckCircle className="w-3.5 h-3.5" /> Guardado
-            </span>
           )}
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            disabled={saving}
-            className="text-xs px-4 py-2"
-          >
-            {saving ? "Guardando..." : "Guardar cambios"}
-          </Button>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
