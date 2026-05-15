@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.core.deps import CurrentUserId, DbSession
+from app.core.deps import CurrentUser, CurrentUserId, DbSession
 from app.schemas.responsible import (
     ActiveTaskBrief,
     ResponsibleCreate,
@@ -74,6 +74,12 @@ async def reactivate_responsible(responsible_id: int, db: DbSession, _: CurrentU
 
 
 @router.delete("/{responsible_id}", response_model=ResponsibleRead)
-async def deactivate_responsible(responsible_id: int, db: DbSession, _: CurrentUserId):
+async def deactivate_responsible(responsible_id: int, db: DbSession, current_user: CurrentUser):
     """Soft-delete: sets is_active=False. Does not remove from DB."""
-    return await ResponsibleService(db).deactivate(responsible_id)
+    actor = {
+        "id": current_user.id,
+        "name": current_user.full_name or current_user.email,
+        "role": current_user.role,
+        "channel": "web",
+    }
+    return await ResponsibleService(db).deactivate(responsible_id, actor=actor)

@@ -1,9 +1,10 @@
 import { io } from "socket.io-client";
+import { getToken } from "./tokenStorage";
 
 const socket = io("http://localhost:8000", {
   // Token is read fresh on every connect/reconnect attempt
   auth: (cb) => {
-    cb({ token: localStorage.getItem("access_token") ?? "" });
+    cb({ token: getToken() ?? "" });
   },
   autoConnect: false,
   reconnection: true,

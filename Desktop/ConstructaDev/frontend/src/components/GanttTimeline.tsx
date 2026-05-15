@@ -5,9 +5,9 @@ import type { Task, TaskStatus, Responsible } from "../types";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-const DAY_W      = 80;   // px per day column
-const ROW_H      = 48;   // px per task row
-const TASK_COL_W = 248;  // px for the fixed left name column
+const ROW_H      = 60;   // px per task row
+const TASK_COL_W = 280;  // px for the fixed left name column
+const BAR_H      = 34;   // px bar height
 
 const TODAY_STR = new Date().toISOString().slice(0, 10);
 const TODAY_MS  = new Date(TODAY_STR).getTime();
@@ -17,15 +17,19 @@ const DND_TYPE  = "application/x-constructa-task";
 
 const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-// ─── Status visual system (matches design) ────────────────────────────────────
+const MONTH_NAMES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const NOW = new Date();
+const currentMonthLabel = `${MONTH_NAMES[NOW.getMonth()]} · ${NOW.getFullYear()}`;
 
-const STATUS_STYLE: Record<TaskStatus, { bg: string; border: string; stripe: string; dot: string; label: string }> = {
-  pendiente:   { bg: "#FEF6E4", border: "#F0C75E", stripe: "#E89B14", dot: "#E89B14", label: "Pendiente"   },
-  en_progreso: { bg: "#FFEEE2", border: "#F09A66", stripe: "#E76A2D", dot: "#E76A2D", label: "En progreso" },
-  bloqueada:   { bg: "#FCE5E5", border: "#EE8A8A", stripe: "#D03A3A", dot: "#D03A3A", label: "Bloqueada"   },
-  en_revision: { bg: "#E8EFFD", border: "#8AA8EE", stripe: "#3A6BD9", dot: "#3A6BD9", label: "En revisión" },
-  completada:  { bg: "#E2F3E9", border: "#7AC498", stripe: "#1F9A5A", dot: "#1F9A5A", label: "Completada"  },
-  cancelada:   { bg: "#F4F1EB", border: "#C9C3B6", stripe: "#94928D", dot: "#94928D", label: "Cancelada"   },
+// ─── Status visual system ─────────────────────────────────────────────────────
+
+const STATUS_STYLE: Record<TaskStatus, { bg: string; border: string; stripe: string; dot: string; label: string; badge: string | null }> = {
+  pendiente:   { bg: "#FFFAEB", border: "#E89B14", stripe: "#E89B14", dot: "#E89B14", label: "Pendiente",   badge: null },
+  en_progreso: { bg: "#FFF1E9", border: "#E85A26", stripe: "#E85A26", dot: "#E85A26", label: "En progreso", badge: null },
+  bloqueada:   { bg: "#FCE5E5", border: "#D03A3A", stripe: "#D03A3A", dot: "#D03A3A", label: "Bloqueada",   badge: "Vencida" },
+  en_revision: { bg: "#E5EEFB", border: "#2A6FDB", stripe: "#2A6FDB", dot: "#2A6FDB", label: "En revisión", badge: "Revisión" },
+  completada:  { bg: "#E4F3EC", border: "#1F8A5B", stripe: "#1F8A5B", dot: "#1F8A5B", label: "Completada",  badge: "Completada" },
+  cancelada:   { bg: "#F4F5F4", border: "#94928D", stripe: "#94928D", dot: "#94928D", label: "Cancelada",   badge: "Cancelada" },
 };
 
 const AVATAR_COLORS = ["#E76A2D", "#3A6BD9", "#1F9A5A", "#9A4DC9", "#D03A3A", "#E89B14", "#0EA5A0"];
@@ -65,44 +69,27 @@ function getInitials(name: string): string {
   return name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 }
 
-// ─── Status icon (Linear-style SVGs) ─────────────────────────────────────────
+// ─── Status dot ───────────────────────────────────────────────────────────────
 
-function StatusIcon({ status, size = 13 }: { status: TaskStatus; size?: number }) {
+function StatusDot({ status }: { status: TaskStatus }) {
   const { dot } = STATUS_STYLE[status];
-  if (status === "completada") return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-      <circle cx="8" cy="8" r="7" fill={dot}/>
-      <path d="M5 8l2 2 4-4" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-  if (status === "en_progreso") return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-      <circle cx="8" cy="8" r="6.5" stroke={dot} strokeWidth="1.5"/>
-      <path d="M8 1.5a6.5 6.5 0 016.5 6.5h-6.5z" fill={dot} transform="rotate(-30 8 8)"/>
-    </svg>
-  );
-  if (status === "bloqueada") return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-      <circle cx="8" cy="8" r="7" fill={dot}/>
-      <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="#fff" strokeWidth="1.7" strokeLinecap="round"/>
-    </svg>
-  );
-  if (status === "en_revision") return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-      <circle cx="8" cy="8" r="6.5" stroke={dot} strokeWidth="1.5"/>
-      <circle cx="8" cy="8" r="2.5" fill={dot}/>
-    </svg>
-  );
-  if (status === "cancelada") return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-      <circle cx="8" cy="8" r="6.5" stroke={dot} strokeWidth="1.5" strokeDasharray="3 2"/>
-    </svg>
-  );
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-      <circle cx="8" cy="8" r="6.5" stroke={dot} strokeWidth="1.5" strokeDasharray="2 2"/>
-    </svg>
-  );
+  const base = { width: 16, height: 16, borderRadius: 99, flexShrink: 0 } as const;
+  if (status === "completada")
+    return (
+      <div style={{ ...base, background: dot, border: `2px solid ${dot}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+          <path d="M2 5l2 2 4-4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+    );
+  if (status === "en_progreso")
+    return <div style={{ ...base, border: `2px solid ${dot}`, background: `radial-gradient(circle, ${dot} 0% 30%, transparent 30%)` }} />;
+  if (status === "cancelada")
+    return <div style={{ ...base, border: "2px dashed #94928D", background: "repeating-linear-gradient(45deg,transparent 0 2px,#D5D7D3 2px 3px)" }} />;
+  if (status === "pendiente")
+    return <div style={{ ...base, border: `2px dashed ${dot}` }} />;
+  // bloqueada, en_revision
+  return <div style={{ ...base, border: `2px solid ${dot}` }} />;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -111,6 +98,7 @@ interface DragState    { taskId: number; startClientX: number; currentDeltaPx: n
 interface ResizeState  { taskId: number; edge: "start" | "end"; startClientX: number; currentDeltaPx: number; }
 interface PendingReschedule { task: Task; newStartDate: string | null; newDueDate: string | null; nearbyCount: number; mode: "move" | "resize-start" | "resize-end"; }
 interface PendingSchedule   { task: Task; dropDate: string; }
+interface RowDragState { taskId: number; startY: number; currentDeltaY: number; }
 
 interface GanttTimelineProps {
   tasks: Task[];
@@ -119,6 +107,7 @@ interface GanttTimelineProps {
   obraExpectedEndDate?: string | null;
   onSaved: () => void;
   onEditTask: (task: Task) => void;
+  tasksWithoutDates?: number;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -130,7 +119,15 @@ export function GanttTimeline({
   obraExpectedEndDate,
   onSaved,
   onEditTask,
+  tasksWithoutDates = 0,
 }: GanttTimelineProps) {
+  // ── View switcher state ──────────────────────────────────────────────────────
+  const [view, setView] = useState<"semana" | "mes" | "trim">("semana");
+  const dayW = view === "semana" ? 90 : view === "mes" ? 45 : 22;
+  const dayWRef = useRef(dayW);
+  dayWRef.current = dayW;
+
+  // ── Existing state ───────────────────────────────────────────────────────────
   const [drag,            setDrag]            = useState<DragState | null>(null);
   const [resize,          setResize]          = useState<ResizeState | null>(null);
   const [pending,         setPending]         = useState<PendingReschedule | null>(null);
@@ -138,11 +135,19 @@ export function GanttTimeline({
   const [selectedId,      setSelectedId]      = useState<number | null>(null);
   const [highlightedId,   setHighlightedId]   = useState<number | null>(null);
   const [isDragOver,      setIsDragOver]      = useState(false);
+  const [hoveredRowId,    setHoveredRowId]    = useState<number | null>(null);
+
+  // ── Row reorder state ────────────────────────────────────────────────────────
+  const [rowOrder,   setRowOrder]   = useState<number[]>([]);
+  const [rowDrag,    setRowDrag]    = useState<RowDragState | null>(null);
+  const rowDragRef   = useRef<RowDragState | null>(null);
+  const orderedVisRef = useRef<Task[]>([]);
 
   const dragRef       = useRef<DragState | null>(null);
   const resizeRef     = useRef<ResizeState | null>(null);
   const onEditRef     = useRef(onEditTask);
   const railRef       = useRef<HTMLDivElement>(null);
+  const scrollRef     = useRef<HTMLDivElement>(null);
   const stateRef      = useRef<{ visible: Task[]; rangeStart: number }>({ visible: [], rangeStart: 0 });
 
   useEffect(() => { onEditRef.current = onEditTask; }, [onEditTask]);
@@ -150,6 +155,25 @@ export function GanttTimeline({
   // ── Date range ──────────────────────────────────────────────────────────────
 
   const visible = tasks.filter(t => t.start_date || t.due_date);
+
+  // ── Ordered visible (for row reorder) ───────────────────────────────────────
+  const visibleById = new Map(visible.map(t => [t.id, t]));
+  const orderedVisible: Task[] = [
+    ...rowOrder.filter(id => visibleById.has(id)).map(id => visibleById.get(id)!),
+    ...visible.filter(t => !rowOrder.includes(t.id)),
+  ];
+  orderedVisRef.current = orderedVisible;
+
+  // Sync rowOrder when visible tasks change
+  useEffect(() => {
+    setRowOrder(prev => {
+      const prevSet = new Set(prev);
+      const newIds = visible.filter(t => !prevSet.has(t.id)).map(t => t.id);
+      const removed = prev.filter(id => visibleById.has(id));
+      return [...removed, ...newIds];
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible.map(t => t.id).join(",")]);
 
   let rangeStart: number;
   let rangeEnd: number;
@@ -170,12 +194,12 @@ export function GanttTimeline({
   }
 
   const totalDays = rangeEnd - rangeStart + 1;
-  const gridWidth = totalDays * DAY_W;
+  const gridWidth = totalDays * dayW;
 
   stateRef.current = { visible, rangeStart };
 
   function offsetToLeft(offset: number): number {
-    return (offset - rangeStart) * DAY_W;
+    return (offset - rangeStart) * dayW;
   }
 
   function getEffectiveDates(task: Task, deltaDays: number, resizeEdge?: "start" | "end") {
@@ -228,6 +252,7 @@ export function GanttTimeline({
     setDrag(null); setResize(null);
 
     const { visible: vis } = stateRef.current;
+    const currentDayW = dayWRef.current;
 
     if (curDrag) {
       if (Math.abs(curDrag.currentDeltaPx) < CLICK_THRESHOLD_PX) {
@@ -235,7 +260,7 @@ export function GanttTimeline({
         if (task) onEditRef.current(task);
         return;
       }
-      const deltaDays = Math.round(curDrag.currentDeltaPx / DAY_W);
+      const deltaDays = Math.round(curDrag.currentDeltaPx / currentDayW);
       if (Math.abs(deltaDays) < 1) return;
       const task = vis.find(t => t.id === curDrag.taskId);
       if (!task) return;
@@ -249,7 +274,7 @@ export function GanttTimeline({
     }
 
     if (curResize) {
-      const deltaDays = Math.round(curResize.currentDeltaPx / DAY_W);
+      const deltaDays = Math.round(curResize.currentDeltaPx / currentDayW);
       if (Math.abs(deltaDays) < 1) return;
       const task = vis.find(t => t.id === curResize.taskId);
       if (!task || !task.start_date || !task.due_date) return;
@@ -280,6 +305,72 @@ export function GanttTimeline({
     };
   }, [drag, resize, handleMouseMove, handleMouseUp]);
 
+  // ── Scroll to today on mount ────────────────────────────────────────────────
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      const todayCol = (-rangeStart) * dayW;
+      const target = todayCol - scrollRef.current.clientWidth / 3;
+      scrollRef.current.scrollLeft = Math.max(0, target);
+    });
+    return () => cancelAnimationFrame(frame);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Row reorder drag handlers ────────────────────────────────────────────────
+
+  function startRowDrag(e: React.PointerEvent, taskId: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    const s: RowDragState = { taskId, startY: e.clientY, currentDeltaY: 0 };
+    rowDragRef.current = s;
+    setRowDrag(s);
+  }
+
+  useEffect(() => {
+    if (!rowDrag) return;
+    function onMove(e: PointerEvent) {
+      if (!rowDragRef.current) return;
+      const u = { ...rowDragRef.current, currentDeltaY: e.clientY - rowDragRef.current.startY };
+      rowDragRef.current = u;
+      setRowDrag(u);
+    }
+    function onUp() {
+      const cur = rowDragRef.current;
+      rowDragRef.current = null;
+      setRowDrag(null);
+      if (!cur) return;
+      const ord = orderedVisRef.current;
+      const origIdx = ord.findIndex(t => t.id === cur.taskId);
+      const targetIdx = Math.max(0, Math.min(ord.length - 1, origIdx + Math.round(cur.currentDeltaY / ROW_H)));
+      if (origIdx !== targetIdx) {
+        const newOrder = ord.map(t => t.id);
+        const [moved] = newOrder.splice(origIdx, 1);
+        newOrder.splice(targetIdx, 0, moved);
+        setRowOrder(newOrder);
+      }
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup",   onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup",   onUp);
+    };
+  }, [rowDrag]);
+
+  function getRowTranslate(taskId: number): number {
+    if (!rowDrag) return 0;
+    const ord = orderedVisRef.current;
+    const origIdx = ord.findIndex(t => t.id === rowDrag.taskId);
+    const thisIdx = ord.findIndex(t => t.id === taskId);
+    const targetIdx = Math.max(0, Math.min(ord.length - 1, origIdx + Math.round(rowDrag.currentDeltaY / ROW_H)));
+    if (taskId === rowDrag.taskId) return rowDrag.currentDeltaY;
+    if (origIdx < targetIdx && thisIdx > origIdx && thisIdx <= targetIdx) return -ROW_H;
+    if (origIdx > targetIdx && thisIdx >= targetIdx && thisIdx < origIdx) return ROW_H;
+    return 0;
+  }
+
   // ── HTML5 DnD ──────────────────────────────────────────────────────────────
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
@@ -305,7 +396,7 @@ export function GanttTimeline({
     const rect = railRef.current?.getBoundingClientRect();
     if (!rect) return;
     const xPx    = e.clientX - rect.left;
-    const offset = rangeStart + Math.floor(xPx / DAY_W);
+    const offset = rangeStart + Math.floor(xPx / dayWRef.current);
     setPendingSchedule({ task, dropDate: offsetToDate(offset) });
   }
 
@@ -330,78 +421,194 @@ export function GanttTimeline({
       {drag   && <div className="fixed inset-0 z-40 cursor-grabbing select-none" />}
       {resize && <div className="fixed inset-0 z-40 cursor-ew-resize select-none" />}
 
-      <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 14, overflow: "hidden" }}>
+      <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 14, overflow: "hidden", cursor: rowDrag ? "grabbing" : undefined }}>
 
         {/* ── Section header ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #F0EBE2" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: "-0.015em", color: "#1B1B1A" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* Calendar icon square */}
+            <div style={{
+              width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+              background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+              border: "1px solid #F5D5C0",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke="#E76A2D" strokeWidth="1.4" fill="none"/>
+                <path d="M5 1.5v2M11 1.5v2M1.5 6h13" stroke="#E76A2D" strokeWidth="1.4" strokeLinecap="round"/>
+                <path d="M4.5 9h1M7.5 9h1M10.5 9h1M4.5 11.5h1M7.5 11.5h1M10.5 11.5h1" stroke="#E76A2D" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, letterSpacing: "-0.015em", color: "#1A2329", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
               Cronograma de tareas
             </h2>
-            <span style={{ fontSize: 12, color: "#94928D", fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center",
+              padding: "2px 9px", borderRadius: 99,
+              fontSize: 11.5, fontWeight: 600, color: "#5B6770",
+              background: "#F0F1EF", border: "1px solid #E6E7E5",
+              fontFamily: "'Plus Jakarta Sans',sans-serif",
+            }}>
               {visible.length} {visible.length === 1 ? "tarea" : "tareas"}
             </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#94928D" }}>
-            {(["Arrastrá", "Bordes", "Clic"] as const).map(k => (
-              <span key={k} style={{ padding: "1px 6px", borderRadius: 4, background: "#F4F1EB", border: "1px solid #ECE7DD", color: "#3A3936", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5 }}>
-                {k}
+            {tasksWithoutDates > 0 && (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "2px 8px", borderRadius: 99,
+                fontSize: 11.5, fontWeight: 600, color: "#C97D0E",
+                background: "#FDF1DE", border: "1px solid #F0D5A0",
+              }}>
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 2L14 14H2L8 2Z" stroke="#E89B14" strokeWidth="1.5" fill="none" strokeLinejoin="round"/>
+                  <path d="M8 7v3M8 11.5v.5" stroke="#E89B14" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                {tasksWithoutDates} sin fecha
               </span>
-            ))}
-            <span style={{ color: "#94928D" }}>para mover · duración · editar</span>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* Semana/Mes/Trim segmented control */}
+            <div style={{ display: "flex", background: "#F4F1EB", borderRadius: 7, padding: 2, border: "1px solid #ECE7DD" }}>
+              {(["semana", "mes", "trim"] as const).map((v, i) => {
+                const lbl = ["Semana", "Mes", "Trim."][i];
+                const isActive = view === v;
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setView(v)}
+                    style={{
+                      background: isActive ? "#fff" : "transparent",
+                      border: "none", cursor: "pointer",
+                      padding: "4px 10px", fontSize: 11.5, fontWeight: 500,
+                      color: isActive ? "#1B1B1A" : "#6B6A66", borderRadius: 5,
+                      boxShadow: isActive ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
+                    }}
+                  >{lbl}</button>
+                );
+              })}
+            </div>
+            {/* Filter */}
+            <button title="Filtrar" style={{ width: 28, height: 28, borderRadius: 6, background: "#fff", border: "1px solid #ECE7DD", display: "flex", alignItems: "center", justifyContent: "center", color: "#3A3936", cursor: "pointer" }}>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+            {/* Go to today */}
+            <button
+              title="Ir a hoy"
+              onClick={() => {
+                if (!scrollRef.current) return;
+                const currentDayW = dayWRef.current;
+                const todayCol = (-rangeStart) * currentDayW;
+                scrollRef.current.scrollTo({ left: Math.max(0, todayCol - scrollRef.current.clientWidth / 3), behavior: "smooth" });
+              }}
+              style={{ width: 28, height: 28, borderRadius: 6, background: "#fff", border: "1px solid #ECE7DD", display: "flex", alignItems: "center", justifyContent: "center", color: "#3A3936", cursor: "pointer" }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="2" fill="#E76A2D"/>
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/>
+              </svg>
+            </button>
           </div>
         </div>
 
         {/* ── Body: sticky name col + scrollable grid ── */}
         <div style={{ display: "flex", overflow: "hidden" }}>
 
-          {/* Left name column */}
+          {/* ── Left task column ── */}
           <div style={{ width: TASK_COL_W, flexShrink: 0, borderRight: "1px solid #F0EBE2", background: "#FAF8F4", display: "flex", flexDirection: "column" }}>
+
             {/* Column header */}
-            <div style={{ height: 40, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: "1px solid #F0EBE2" }}>
-              <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.06em", color: "#94928D", textTransform: "uppercase" }}>Tarea</span>
+            <div style={{ height: 40, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: "1px solid #F0EBE2", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#94928D", textTransform: "uppercase" }}>Tarea</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: "#8E97A0" }}>{currentMonthLabel}</span>
             </div>
+
             {/* Task rows */}
-            {visible.length === 0 ? (
-              <div style={{ padding: "24px 16px", color: "#94928D", fontSize: 12.5, textAlign: "center" }}>
-                Sin tareas programadas
-              </div>
+            {orderedVisible.length === 0 ? (
+              <div style={{ padding: "24px 16px", color: "#94928D", fontSize: 12.5, textAlign: "center" }}>Sin tareas programadas</div>
             ) : (
-              visible.map(task => {
-                const isSel  = selectedId === task.id;
-                const resp   = task.responsible_id ? responsibles.find(r => r.id === task.responsible_id) : null;
+              orderedVisible.map(task => {
+                const isSel = selectedId === task.id;
+                const isHov = hoveredRowId === task.id;
+                const resp  = task.responsible_id ? responsibles.find(r => r.id === task.responsible_id) : null;
+                const isDraggingThis = rowDrag?.taskId === task.id;
                 return (
                   <div
                     key={task.id}
+                    onMouseEnter={() => setHoveredRowId(task.id)}
+                    onMouseLeave={() => setHoveredRowId(null)}
                     onClick={() => { setSelectedId(task.id); onEditTask(task); }}
                     style={{
-                      height: ROW_H,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
+                      height: ROW_H, display: "grid",
+                      gridTemplateColumns: "18px 18px 1fr auto",
+                      alignItems: "center", gap: 8,
                       padding: "0 12px 0 8px",
                       borderBottom: "1px solid #F4F1EB",
                       cursor: "pointer",
-                      background: isSel ? "#F4F1EB" : "transparent",
-                      transition: "background 0.12s",
+                      background: isSel ? "#F4F1EB" : (isHov ? "#FCFBF9" : "transparent"),
+                      transition: isDraggingThis ? "background 0.12s" : "background 0.12s, transform 0.22s cubic-bezier(.22,.61,.36,1)",
+                      transform: `translateY(${getRowTranslate(task.id)}px)`,
+                      zIndex: isDraggingThis ? 10 : "auto" as unknown as number,
+                      boxShadow: isDraggingThis ? "0 8px 24px -6px rgba(24,34,42,0.18), 0 0 0 1px #D5D7D3" : "none",
+                      position: "relative",
                     }}
                   >
-                    {/* Grip dots */}
-                    <svg width="10" height="14" viewBox="0 0 10 14" fill="none" style={{ flexShrink: 0, color: "#C9C3B6" }}>
-                      <circle cx="3" cy="3" r="1.1" fill="currentColor"/><circle cx="3" cy="7" r="1.1" fill="currentColor"/>
-                      <circle cx="3" cy="11" r="1.1" fill="currentColor"/><circle cx="7" cy="3" r="1.1" fill="currentColor"/>
-                      <circle cx="7" cy="7" r="1.1" fill="currentColor"/><circle cx="7" cy="11" r="1.1" fill="currentColor"/>
-                    </svg>
-                    <StatusIcon status={task.status} size={13} />
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 500, color: "#1B1B1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {/* Grip */}
+                    <GripHandle onPointerDown={(e) => startRowDrag(e, task.id)} />
+
+                    {/* Status dot */}
+                    <StatusDot status={task.status} />
+
+                    {/* Name + owner */}
+                    <div style={{ minWidth: 0, lineHeight: 1.2 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2329", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {task.title}
-                      </span>
+                      </div>
                       {resp && (
-                        <span style={{ fontSize: 10.5, color: "#94928D", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {resp.full_name}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
+                          <div style={{
+                            width: 14, height: 14, borderRadius: 99, flexShrink: 0,
+                            background: avatarColor(resp.full_name),
+                            color: "#fff", fontSize: 8, fontWeight: 700,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontFamily: "'Plus Jakarta Sans',sans-serif",
+                          }}>
+                            {getInitials(resp.full_name)[0]}
+                          </div>
+                          <span style={{ fontSize: 11, color: "#94928D", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {resp.full_name}
+                          </span>
+                        </div>
                       )}
+                    </div>
+
+                    {/* Hover actions */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, opacity: isHov ? 1 : 0, transition: "opacity 0.15s" }}>
+                      <button
+                        onClick={e => { e.stopPropagation(); onEditTask(task); }}
+                        title="Editar"
+                        style={{ width: 24, height: 24, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#8E97A0", background: "none", border: "none", cursor: "pointer" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#F4F5F4")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                          <path d="M11.5 2.5l2 2-8 8H3.5v-2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={e => e.stopPropagation()}
+                        title="Más"
+                        style={{ width: 24, height: 24, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#8E97A0", background: "none", border: "none", cursor: "pointer" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#F4F5F4")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                          <circle cx="3.5" cy="8" r="1.2"/>
+                          <circle cx="8" cy="8" r="1.2"/>
+                          <circle cx="12.5" cy="8" r="1.2"/>
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 );
@@ -409,42 +616,48 @@ export function GanttTimeline({
             )}
           </div>
 
-          {/* Right: scrollable date grid */}
-          <div style={{ flex: 1, overflowX: "auto" }}>
+          {/* ── Right scrollable grid ── */}
+          <div ref={scrollRef} style={{ flex: 1, overflowX: "auto" }}>
             <div style={{ width: gridWidth, minWidth: "100%" }}>
 
               {/* Day header row */}
-              <div style={{ display: "flex", height: 40, borderBottom: "1px solid #F0EBE2", background: "#FAF8F4", position: "sticky", top: 0, zIndex: 6 }}>
+              <div style={{ display: "flex", height: 40, borderBottom: "1px solid #F0EBE2", position: "sticky", top: 0, zIndex: 6 }}>
                 {Array.from({ length: totalDays }).map((_, i) => {
                   const offset  = rangeStart + i;
                   const d       = new Date(TODAY_MS + offset * DAY_MS);
                   const isToday = offset === 0;
                   const we      = isWeekend(d);
                   return (
-                    <div
-                      key={i}
-                      style={{
-                        width: DAY_W,
-                        flexShrink: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 2,
-                        borderLeft: i === 0 ? "none" : "1px solid #F0EBE2",
-                        background: we ? "#F7F4EF" : "transparent",
-                      }}
-                    >
-                      <div style={{ fontSize: 9.5, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: isToday ? "#E76A2D" : "#94928D" }}>
-                        {DAY_NAMES[d.getDay()]}
-                      </div>
-                      {isToday ? (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#E76A2D", borderRadius: 99, padding: "2px 8px", lineHeight: 1.3 }}>
-                          Hoy
-                        </span>
-                      ) : (
-                        <div style={{ fontSize: 12.5, fontWeight: 500, color: "#3A3936" }}>{d.getDate()}</div>
+                    <div key={i} style={{
+                      width: dayW, flexShrink: 0,
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                      gap: view === "semana" ? 2 : 1, padding: "6px 0",
+                      borderLeft: i === 0 ? "none" : "1px solid #F0EBE2",
+                      background: isToday ? "#E85A26" : (we ? "#F4F5F4" : "#FAFAF9"),
+                    }}>
+                      {/* Day name label — semana: always shown; mes: shown small; trim: hidden */}
+                      {view !== "trim" && (
+                        <div style={{
+                          fontSize: view === "semana" ? 9.5 : 9,
+                          fontWeight: 500,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          color: isToday ? "rgba(255,255,255,0.85)" : "#94928D",
+                        }}>
+                          {DAY_NAMES[d.getDay()]}
+                        </div>
                       )}
+                      {/* Date number */}
+                      <div style={{
+                        fontSize: view === "semana" ? 18 : view === "mes" ? 13 : 10,
+                        fontWeight: view === "semana" ? 700 : 600,
+                        letterSpacing: "-0.02em",
+                        lineHeight: 1,
+                        fontFamily: "'Plus Jakarta Sans',sans-serif",
+                        color: isToday ? "#fff" : (we ? "#5B6770" : "#1A2329"),
+                      }}>
+                        {d.getDate()}
+                      </div>
                     </div>
                   );
                 })}
@@ -460,47 +673,38 @@ export function GanttTimeline({
                   position: "relative",
                   outline: isDragOver ? "2px solid #E76A2D" : "none",
                   outlineOffset: -2,
-                  minHeight: visible.length === 0 ? ROW_H * 3 : ROW_H * visible.length,
+                  minHeight: orderedVisible.length === 0 ? ROW_H * 3 : ROW_H * orderedVisible.length,
                 }}
               >
-                {/* Weekend background layer */}
+                {/* Weekend background columns */}
                 <div style={{ position: "absolute", inset: 0, display: "flex", pointerEvents: "none", zIndex: 0 }}>
                   {Array.from({ length: totalDays }).map((_, i) => {
                     const offset = rangeStart + i;
                     const d = new Date(TODAY_MS + offset * DAY_MS);
                     return (
-                      <div
-                        key={i}
-                        style={{
-                          width: DAY_W,
-                          flexShrink: 0,
-                          height: "100%",
-                          borderLeft: i === 0 ? "none" : "1px solid #F0EBE2",
-                          background: isWeekend(d) ? "#F7F4EF" : "transparent",
-                        }}
-                      />
+                      <div key={i} style={{
+                        width: dayW, flexShrink: 0, height: "100%",
+                        borderLeft: i === 0 ? "none" : "1px solid #F0EBE2",
+                        background: isWeekend(d) ? "#F7F4EF" : "transparent",
+                      }} />
                     );
                   })}
                 </div>
 
-                {/* Today orange line */}
+                {/* Today vertical line */}
                 {0 >= rangeStart && 0 <= rangeEnd && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      bottom: 0,
-                      left: offsetToLeft(0),
-                      width: 1.5,
-                      background: "#E76A2D",
-                      pointerEvents: "none",
-                      zIndex: 4,
-                    }}
-                  />
+                  <div style={{
+                    position: "absolute", top: 0, bottom: 0,
+                    left: offsetToLeft(0),
+                    width: 2,
+                    background: "linear-gradient(180deg,#E76A2D 0%,rgba(231,106,45,0.35) 100%)",
+                    boxShadow: "0 0 0 4px rgba(231,106,45,0.06)",
+                    pointerEvents: "none", zIndex: 4,
+                  }} />
                 )}
 
                 {/* Empty state */}
-                {visible.length === 0 && (
+                {orderedVisible.length === 0 && (
                   <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>
                     <p style={{ fontSize: 12.5, color: "#94928D" }}>
                       {isDragOver ? "Soltá acá para programar la tarea" : "Sin tareas programadas. Arrastrá tareas desde abajo para programarlas."}
@@ -509,31 +713,31 @@ export function GanttTimeline({
                 )}
 
                 {/* Task bar rows */}
-                {visible.map((task, idx) => {
+                {orderedVisible.map((task) => {
                   const isThisDrag   = drag?.taskId   === task.id;
                   const isThisResize = resize?.taskId === task.id;
                   const isSel  = selectedId    === task.id;
                   const isHL   = highlightedId === task.id;
                   const st     = STATUS_STYLE[task.status];
+                  const isDraggingThisRow = rowDrag?.taskId === task.id;
 
-                  // Live delta
-                  let deltaDays  = 0;
+                  let deltaDays = 0;
                   let resizeEdge: "start" | "end" | undefined;
-                  if (isThisDrag   && drag)   deltaDays = Math.round(drag.currentDeltaPx   / DAY_W);
-                  if (isThisResize && resize) { deltaDays = Math.round(resize.currentDeltaPx / DAY_W); resizeEdge = resize.edge; }
+                  if (isThisDrag   && drag)   deltaDays = Math.round(drag.currentDeltaPx   / dayW);
+                  if (isThisResize && resize) { deltaDays = Math.round(resize.currentDeltaPx / dayW); resizeEdge = resize.edge; }
 
                   const { start, due } = getEffectiveDates(task, deltaDays, resizeEdge);
-
                   const hasBoth    = !!(start && due);
                   const startOff   = start ? dateToOffset(start) : null;
                   const dueOff     = due   ? dateToOffset(due)   : null;
                   const barLeftPx  = startOff !== null ? offsetToLeft(startOff) + 4 : (dueOff !== null ? offsetToLeft(dueOff) - 6 : 0);
-                  const barWidthPx = hasBoth ? Math.max(8, (dueOff! - startOff!) * DAY_W - 8) : 12;
+                  const barWidthPx = hasBoth ? Math.max(8, (dueOff! - startOff!) * dayW - 8) : 12;
 
-                  const resp       = task.responsible_id ? responsibles.find(r => r.id === task.responsible_id) : null;
-                  const initials   = resp ? getInitials(resp.full_name) : null;
-                  const avatarBg   = resp ? avatarColor(resp.full_name) : "#94928D";
-                  const isOverdue  = task.status !== "completada" && task.status !== "cancelada" && !!task.due_date && task.due_date < TODAY_STR;
+                  const resp     = task.responsible_id ? responsibles.find(r => r.id === task.responsible_id) : null;
+                  const initials = resp ? getInitials(resp.full_name) : null;
+                  const avatarBg = resp ? avatarColor(resp.full_name) : "#94928D";
+                  const isOverdue = task.status !== "completada" && task.status !== "cancelada" && !!task.due_date && task.due_date < TODAY_STR;
+                  const pct = task.estimated_progress ?? 0;
 
                   const barBoxShadow = isHL
                     ? "0 0 0 2px #E76A2D"
@@ -545,82 +749,114 @@ export function GanttTimeline({
                     <div
                       key={task.id}
                       style={{
-                        position: "relative",
-                        height: ROW_H,
+                        position: "relative", height: ROW_H,
                         borderBottom: "1px solid #F4F1EB",
-                        background: isSel ? "rgba(231,106,45,0.04)" : (idx % 2 === 1 ? "#FDFCFA" : "transparent"),
-                        zIndex: 1,
+                        background: isSel ? "rgba(231,106,45,0.04)" : "transparent",
+                        zIndex: isDraggingThisRow ? 10 : 1,
+                        transform: `translateY(${getRowTranslate(task.id)}px)`,
+                        transition: isDraggingThisRow ? "none" : "transform 0.22s cubic-bezier(.22,.61,.36,1)",
                       }}
                     >
                       {/* Bar */}
                       {(startOff !== null || dueOff !== null) && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 6,
-                            bottom: 6,
-                            left: barLeftPx,
-                            width: barWidthPx,
-                            zIndex: isThisDrag || isThisResize ? 5 : (isSel ? 3 : 1),
-                          }}
-                        >
+                        <div style={{
+                          position: "absolute",
+                          top: (ROW_H - BAR_H) / 2,
+                          height: BAR_H,
+                          left: barLeftPx,
+                          width: barWidthPx,
+                          zIndex: isThisDrag || isThisResize ? 5 : (isSel ? 3 : 1),
+                        }}>
                           {/* Bar body */}
                           <div
                             style={{
-                              position: "absolute",
-                              inset: 0,
-                              borderRadius: 8,
-                              background: st.bg,
-                              border: `1px solid ${isOverdue ? "#D03A3A" : st.border}`,
+                              position: "absolute", inset: 0,
+                              borderRadius: 99,
+                              background: isOverdue ? "#FCE5E5" : st.bg,
+                              border: `1.5px solid ${isOverdue ? "#D03A3A" : st.border}`,
                               boxShadow: barBoxShadow,
                               cursor: isThisDrag ? "grabbing" : "grab",
-                              transform: isThisDrag ? "translateY(-1px) scale(1.004)" : "none",
+                              transform: isThisDrag ? "translateY(-1px)" : "none",
                               transition: isThisDrag || isThisResize ? "none" : "box-shadow 0.15s, transform 0.15s",
-                              display: "flex",
-                              alignItems: "center",
-                              overflow: "hidden",
                               userSelect: "none",
                             }}
-                            onMouseDown={(e) => {
+                            onMouseDown={e => {
                               if ((e.target as HTMLElement).closest(".edge-handle")) return;
                               e.preventDefault();
                               startBarDrag(task.id, e.clientX);
                             }}
                           >
-                            {/* Left status stripe */}
-                            <div style={{ position: "absolute", left: 0, top: 5, bottom: 5, width: 3, borderRadius: 99, background: isOverdue ? "#D03A3A" : st.stripe }} />
+                            {/* Left stripe */}
+                            <div style={{
+                              position: "absolute", left: 0, top: 6, bottom: 6, width: 6,
+                              borderRadius: 99,
+                              background: isOverdue ? "#D03A3A" : st.stripe,
+                            }} />
 
-                            {/* Task name inside bar (if enough space) */}
-                            {hasBoth && barWidthPx > 52 && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 14, paddingRight: 4, flex: 1, minWidth: 0 }}>
-                                <span style={{ fontSize: 11.5, fontWeight: 500, color: "#1B1B1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {/* Progress fill */}
+                            {hasBoth && pct > 0 && (
+                              <div style={{
+                                position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)",
+                                height: 4, borderRadius: 99,
+                                width: `${Math.min(pct, 100)}%`,
+                                maxWidth: "calc(100% - 36px)",
+                                background: isOverdue ? "#D03A3A" : st.stripe,
+                                opacity: 0.18,
+                                pointerEvents: "none",
+                              }} />
+                            )}
+
+                            {/* Text content area — clipped */}
+                            {hasBoth && barWidthPx > 40 && (
+                              <div style={{
+                                position: "absolute",
+                                left: 14,
+                                right: initials ? 34 : 8,
+                                top: 0, bottom: 0,
+                                display: "flex", alignItems: "center", gap: 5,
+                                overflow: "hidden",
+                              }}>
+                                <span style={{
+                                  fontSize: 12, fontWeight: 600, color: "#1A2329",
+                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                  flexShrink: 1, minWidth: 0,
+                                }}>
                                   {task.title}
                                 </span>
-                                {isOverdue && (
-                                  <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 99, background: "#D03A3A", color: "#fff" }}>
-                                    Vencida
+                                {/* Status badge */}
+                                {(isOverdue || st.badge) && barWidthPx > 90 && (
+                                  <span style={{
+                                    flexShrink: 0, fontSize: 10, fontWeight: 600,
+                                    padding: "2px 7px", borderRadius: 99,
+                                    background: isOverdue ? "#D03A3A" : st.stripe,
+                                    color: "#fff", lineHeight: 1,
+                                  }}>
+                                    {isOverdue ? "Vencida" : st.badge}
+                                  </span>
+                                )}
+                                {/* Progress % — only for pendiente/en_progreso with no badge, when there's room */}
+                                {!isOverdue && !st.badge && pct > 0 && barWidthPx > 130 && (
+                                  <span style={{
+                                    flexShrink: 0,
+                                    fontFamily: "'JetBrains Mono',monospace",
+                                    fontSize: 10, fontWeight: 500,
+                                    color: "#8E97A0", padding: "2px 6px", borderRadius: 99, background: "#F4F5F4",
+                                  }}>
+                                    {pct}%
                                   </span>
                                 )}
                               </div>
                             )}
 
-                            {/* Assignee avatar */}
-                            {initials && hasBoth && barWidthPx > 80 && (
+                            {/* Assignee avatar — always at right edge */}
+                            {initials && hasBoth && barWidthPx > 50 && (
                               <div style={{
+                                position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                                width: 22, height: 22, borderRadius: 99,
+                                background: avatarBg, color: "#fff", fontSize: 9.5, fontWeight: 700,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                border: "2px solid #fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                                 flexShrink: 0,
-                                width: 22,
-                                height: 22,
-                                borderRadius: 99,
-                                background: avatarBg,
-                                color: "#fff",
-                                fontSize: 9.5,
-                                fontWeight: 700,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                border: "2px solid #fff",
-                                boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
-                                marginRight: 6,
                               }}>
                                 {initials}
                               </div>
@@ -630,7 +866,7 @@ export function GanttTimeline({
                           {/* Left resize handle */}
                           <div
                             className="edge-handle"
-                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); startEdgeResize(task.id, "start", e.clientX); }}
+                            onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startEdgeResize(task.id, "start", e.clientX); }}
                             style={{ position: "absolute", top: 0, bottom: 0, left: -4, width: 12, cursor: "ew-resize", display: "flex", alignItems: "center" }}
                           >
                             <div style={{ width: 3, height: 14, borderRadius: 99, background: "rgba(20,20,20,0.16)" }} />
@@ -639,29 +875,19 @@ export function GanttTimeline({
                           {/* Right resize handle */}
                           <div
                             className="edge-handle"
-                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); startEdgeResize(task.id, "end", e.clientX); }}
+                            onMouseDown={e => { e.preventDefault(); e.stopPropagation(); startEdgeResize(task.id, "end", e.clientX); }}
                             style={{ position: "absolute", top: 0, bottom: 0, right: -4, width: 12, cursor: "ew-resize", display: "flex", alignItems: "center", justifyContent: "flex-end" }}
                           >
                             <div style={{ width: 3, height: 14, borderRadius: 99, background: "rgba(20,20,20,0.16)" }} />
                           </div>
 
-                          {/* Delta label (floating tooltip above bar during drag) */}
+                          {/* Delta tooltip */}
                           {(isThisDrag || isThisResize) && deltaDays !== 0 && start && due && (
                             <div style={{
-                              position: "absolute",
-                              top: -28,
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                              whiteSpace: "nowrap",
-                              background: "#1B1B1A",
-                              color: "#fff",
-                              fontSize: 10.5,
-                              fontWeight: 500,
-                              fontFamily: "'JetBrains Mono', monospace",
-                              padding: "3px 10px",
-                              borderRadius: 99,
-                              pointerEvents: "none",
-                              zIndex: 20,
+                              position: "absolute", top: -28, left: "50%", transform: "translateX(-50%)",
+                              whiteSpace: "nowrap", background: "#1B1B1A", color: "#fff",
+                              fontSize: 10.5, fontWeight: 500, fontFamily: "'JetBrains Mono',monospace",
+                              padding: "3px 10px", borderRadius: 99, pointerEvents: "none", zIndex: 20,
                               boxShadow: "0 4px 12px -2px rgba(0,0,0,0.22)",
                             }}>
                               {deltaDays > 0 ? "+" : ""}{deltaDays}d · {fmtShort(start)} → {fmtShort(due)}
@@ -673,12 +899,10 @@ export function GanttTimeline({
                   );
                 })}
 
-                {/* Drop zone strip when dragging unscheduled tasks */}
+                {/* Drop zone */}
                 {isDragOver && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 0", borderTop: "2px dashed #E76A2D", background: "rgba(231,106,45,0.05)", zIndex: 10, position: "relative" }}>
-                    <p style={{ fontSize: 12.5, fontWeight: 600, color: "#E76A2D", margin: 0 }}>
-                      Soltá acá para programar la tarea
-                    </p>
+                    <p style={{ fontSize: 12.5, fontWeight: 600, color: "#E76A2D", margin: 0 }}>Soltá acá para programar la tarea</p>
                   </div>
                 )}
               </div>
@@ -688,17 +912,23 @@ export function GanttTimeline({
 
         {/* ── Legend ── */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 18px", borderTop: "1px solid #F0EBE2", background: "#FAF8F4", flexWrap: "wrap" }}>
-          {(Object.entries(STATUS_STYLE) as [TaskStatus, (typeof STATUS_STYLE)[TaskStatus]][]).map(([, st]) => (
+          {(Object.entries(STATUS_STYLE) as [TaskStatus, typeof STATUS_STYLE[TaskStatus]][]).map(([, st]) => (
             <div key={st.label} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{ width: 18, height: 11, borderRadius: 4, background: st.bg, border: `1px solid ${st.border}`, position: "relative", overflow: "hidden", flexShrink: 0 }}>
-                <div style={{ position: "absolute", left: 0, top: 1, bottom: 1, width: 2.5, borderRadius: 99, background: st.stripe }} />
+              <div style={{ width: 22, height: 12, borderRadius: 99, background: st.bg, border: `1.5px solid ${st.border}`, position: "relative", overflow: "hidden", flexShrink: 0 }}>
+                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: st.stripe, borderRadius: "99px 0 0 99px" }} />
               </div>
               <span style={{ fontSize: 11.5, color: "#6B6A66" }}>{st.label}</span>
             </div>
           ))}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 1.5, height: 14, borderRadius: 99, background: "#E76A2D" }} />
-            <span style={{ fontSize: 11.5, color: "#E76A2D", fontWeight: 500 }}>Hoy</span>
+            <div style={{ width: 2, height: 14, borderRadius: 99, background: "#E76A2D" }} />
+            <span style={{ fontSize: 11.5, color: "#E76A2D", fontWeight: 500, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Hoy</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#94928D", fontSize: 11, marginLeft: 8 }}>
+            {["Arrastrá", "Bordes", "Clic"].map(k => (
+              <span key={k} style={{ padding: "1px 6px", borderRadius: 4, background: "#fff", border: "1px solid #ECE7DD", color: "#3A3936", fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5 }}>{k}</span>
+            ))}
+            <span>para mover · duración · editar</span>
           </div>
         </div>
       </div>
@@ -725,5 +955,27 @@ export function GanttTimeline({
         />
       )}
     </>
+  );
+}
+
+// ─── Grip handle sub-component (hover color change) ──────────────────────────
+
+function GripHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent) => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <svg
+      width="10" height="14" viewBox="0 0 10 14" fill="none"
+      style={{ color: hovered ? "#8E97A0" : "#C9C3B6", flexShrink: 0, cursor: "grab", transition: "color 0.15s" }}
+      onPointerDown={onPointerDown}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <circle cx="3" cy="2.5" r="1.2" fill="currentColor"/>
+      <circle cx="7" cy="2.5" r="1.2" fill="currentColor"/>
+      <circle cx="3" cy="7"   r="1.2" fill="currentColor"/>
+      <circle cx="7" cy="7"   r="1.2" fill="currentColor"/>
+      <circle cx="3" cy="11.5" r="1.2" fill="currentColor"/>
+      <circle cx="7" cy="11.5" r="1.2" fill="currentColor"/>
+    </svg>
   );
 }

@@ -1,59 +1,29 @@
 import { useState, useRef, type ReactNode, type ChangeEvent, type KeyboardEvent } from "react";
 import {
-  X,
-  Plus,
-  Trash2,
-  Pencil,
-  AlertTriangle,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Upload,
-  ImageOff,
+  X, Plus, Trash2, Pencil, AlertTriangle, CheckCircle2,
+  ChevronLeft, ChevronRight, Loader2, Upload, ImageOff, Building2,
 } from "lucide-react";
 import { uploadImage } from "../api/upload";
 import { createObra } from "../api/obras";
 import { createResponsible } from "../api/responsibles";
 import { createTask } from "../api/tasks";
-import { Button } from "./ui/Button";
 import type { Obra } from "../types";
 
 // ─── Local draft types ────────────────────────────────────────────────────────
 
 interface ObraFormData {
-  name: string;
-  location: string;
-  description: string;
-  image_url: string;
-  start_date: string;
-  expected_end_date: string;
+  name: string; location: string; description: string;
+  image_url: string; start_date: string; expected_end_date: string;
 }
-
 interface DraftResponsible {
-  _key: string;
-  full_name: string;
-  whatsapp_number: string;
-  role: string;
+  _key: string; full_name: string; whatsapp_number: string; role: string;
 }
-
 interface DraftTask {
-  _key: string;
-  title: string;
-  description: string;
-  responsible_key: string;
-  start_date: string;
-  due_date: string;
+  _key: string; title: string; description: string;
+  responsible_key: string; start_date: string; due_date: string;
 }
-
 type RespForm = { full_name: string; whatsapp_number: string; role: string };
-type TaskForm = {
-  title: string;
-  description: string;
-  responsible_key: string;
-  start_date: string;
-  due_date: string;
-};
+type TaskForm = { title: string; description: string; responsible_key: string; start_date: string; due_date: string };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,15 +32,12 @@ let _seq = 0;
 const uid = () => String(++_seq);
 
 const STEPS = ["Datos básicos", "Responsables", "Tareas", "Confirmación"];
-
-function inputCls(err = false) {
-  return [
-    "w-full border rounded px-3 py-2.5 text-sm text-constructa-text bg-white",
-    "placeholder:text-constructa-border",
-    "focus:outline-none focus:ring-2 focus:ring-constructa-primary focus:border-constructa-primary transition",
-    err ? "border-constructa-danger" : "border-constructa-border",
-  ].join(" ");
-}
+const STEP_ICONS = [
+  <svg key="1" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 13.5V6l5-3.5 5 3.5v7.5h-10z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><path d="M6 13.5V10h3v3.5" stroke="currentColor" strokeWidth="1.4"/></svg>,
+  <svg key="2" width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M2.5 13.5c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>,
+  <svg key="3" width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M5 7h6M5 10h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
+  <svg key="4" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>,
+];
 
 function formatDate(d: string) {
   if (!d) return "—";
@@ -78,39 +45,140 @@ function formatDate(d: string) {
   return `${day}/${m}/${y}`;
 }
 
+function getInitials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
+}
+
+const AVATAR_COLORS = ["#E76A2D", "#3A6BD9", "#1F9A5A", "#9A4DC9", "#D03A3A", "#E89B14"];
+function avatarColor(name: string) {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+// ─── Design helpers ────────────────────────────────────────────────────────────
+
+const BASE_INPUT: React.CSSProperties = {
+  width: "100%", boxSizing: "border-box",
+  padding: "9px 12px", fontSize: 13,
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  color: "#1A2329", background: "#fff",
+  border: "1px solid #E6E7E5", borderRadius: 10, outline: "none",
+  transition: "border-color 0.15s, box-shadow 0.15s",
+};
+
+function iStyle(err = false): React.CSSProperties {
+  return { ...BASE_INPUT, borderColor: err ? "#D03A3A" : "#E6E7E5", boxShadow: err ? "0 0 0 3px rgba(208,58,58,0.08)" : "none" };
+}
+
+function onFocus(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, err = false) {
+  if (err) return;
+  e.currentTarget.style.borderColor = "#FF6B35";
+  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(255,107,53,0.10)";
+}
+function onBlur(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, err = false) {
+  e.currentTarget.style.borderColor = err ? "#D03A3A" : "#E6E7E5";
+  e.currentTarget.style.boxShadow = err ? "0 0 0 3px rgba(208,58,58,0.08)" : "none";
+}
+
 // ─── UI atoms ─────────────────────────────────────────────────────────────────
 
-function FieldLabel({
-  children,
-  optional,
-}: {
-  children: ReactNode;
-  optional?: boolean;
-}) {
+function FieldLabel({ children, optional }: { children: ReactNode; optional?: boolean }) {
   return (
-    <label className="block text-xs font-bold uppercase tracking-widest text-constructa-secondaryText mb-1.5">
-      {children}
-      {optional && (
-        <span className="ml-1.5 normal-case tracking-normal font-normal text-constructa-border">
-          (opcional)
-        </span>
-      )}
-    </label>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#5B6770", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        {children}
+      </span>
+      {optional && <span style={{ fontSize: 10.5, color: "#ADAAA4", fontWeight: 400 }}>(opcional)</span>}
+    </div>
   );
 }
 
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
-  return <p className="mt-1 text-xs text-constructa-danger">{msg}</p>;
+  return (
+    <p style={{ margin: "5px 0 0", fontSize: 11.5, color: "#D03A3A", display: "flex", alignItems: "center", gap: 5, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <AlertTriangle style={{ width: 11, height: 11 }} />{msg}
+    </p>
+  );
 }
 
 function InlineError({ msg }: { msg: string | null }) {
   if (!msg) return null;
   return (
-    <p className="text-xs text-constructa-danger flex items-center gap-1.5">
-      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-      {msg}
-    </p>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "#FCE5E5", border: "1px solid #F0B0B0", borderRadius: 10, padding: "9px 12px" }}>
+      <AlertTriangle style={{ width: 12, height: 12, color: "#D03A3A", flexShrink: 0, marginTop: 1 }} />
+      <p style={{ margin: 0, fontSize: 12, color: "#D03A3A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{msg}</p>
+    </div>
+  );
+}
+
+function PrimaryBtn({ children, onClick, disabled, type = "button" }: { children: ReactNode; onClick?: () => void; disabled?: boolean; type?: "button" | "submit" }) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "9px 18px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+        background: disabled ? "#F0A882" : "#FF6B35", color: "#fff",
+        border: "none", cursor: disabled ? "not-allowed" : "pointer",
+        boxShadow: disabled ? "none" : "inset 0 1px 0 rgba(255,255,255,0.18), 0 6px 14px -6px rgba(255,107,53,0.5)",
+        fontFamily: "'Plus Jakarta Sans', sans-serif",
+        transition: "background 0.15s",
+      }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = "#E85A26"; }}
+      onMouseLeave={e => { if (!disabled) e.currentTarget.style.background = "#FF6B35"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SecondaryBtn({ children, onClick, disabled }: { children: ReactNode; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "9px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+        background: "#fff", color: "#5B6770",
+        border: "1px solid #E6E7E5", cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+        fontFamily: "'Plus Jakarta Sans', sans-serif",
+        transition: "border-color 0.15s, color 0.15s",
+      }}
+      onMouseEnter={e => { if (!disabled) { e.currentTarget.style.borderColor = "#D5D7D3"; e.currentTarget.style.color = "#1A2329"; } }}
+      onMouseLeave={e => { if (!disabled) { e.currentTarget.style.borderColor = "#E6E7E5"; e.currentTarget.style.color = "#5B6770"; } }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SmallIconBtn({ children, onClick, title, danger }: { children: ReactNode; onClick: () => void; title?: string; danger?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 30, height: 30, borderRadius: 8, border: "none",
+        background: "transparent", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#8E97A0", transition: "background 0.15s, color 0.15s",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.background = danger ? "#FCE5E5" : "#EAF1FB";
+        e.currentTarget.style.color = danger ? "#D03A3A" : "#2A6FDB";
+      }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8E97A0"; }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -118,42 +186,45 @@ function InlineError({ msg }: { msg: string | null }) {
 
 function StepBar({ current }: { current: number }) {
   return (
-    <div className="flex items-start justify-between mb-8">
+    <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 28 }}>
       {STEPS.map((label, i) => {
         const n = i + 1;
         const active = n === current;
         const done = n < current;
         return (
-          <div key={n} className="flex items-start flex-1 min-w-0">
-            <div className="flex flex-col items-center flex-shrink-0">
-              <div
-                className={[
-                  "w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-colors",
-                  active || done
-                    ? "bg-constructa-primary border-constructa-primary text-white"
-                    : "bg-white border-constructa-border text-constructa-secondaryText",
-                ].join(" ")}
-              >
-                {done ? "✓" : n}
+          <div key={n} style={{ display: "flex", alignItems: "flex-start", flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: 99,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: 700,
+                background: active ? "#FF6B35" : done ? "#1F8A5B" : "#F0F1EF",
+                color: (active || done) ? "#fff" : "#8E97A0",
+                border: `2px solid ${active ? "#FF6B35" : done ? "#1F8A5B" : "#E6E7E5"}`,
+                boxShadow: active ? "0 4px 10px -4px rgba(255,107,53,0.5)" : "none",
+                transition: "all 0.2s",
+              }}>
+                {done
+                  ? <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  : <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{n}</span>
+                }
               </div>
-              <span
-                className={[
-                  "mt-1.5 text-[10px] font-semibold text-center leading-tight px-1",
-                  active || done
-                    ? "text-constructa-primary"
-                    : "text-constructa-secondaryText",
-                ].join(" ")}
-              >
+              <span style={{
+                marginTop: 6, fontSize: 10.5, fontWeight: active ? 700 : 500,
+                color: active ? "#FF6B35" : done ? "#1F8A5B" : "#8E97A0",
+                textAlign: "center", lineHeight: 1.2, padding: "0 4px",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                whiteSpace: "nowrap",
+              }}>
                 {label}
               </span>
             </div>
             {i < STEPS.length - 1 && (
-              <div
-                className={[
-                  "flex-1 h-0.5 mt-3.5 mx-1 transition-colors",
-                  done ? "bg-constructa-primary" : "bg-constructa-border",
-                ].join(" ")}
-              />
+              <div style={{
+                flex: 1, height: 2, marginTop: 14, marginLeft: 6, marginRight: 6,
+                background: done ? "#1F8A5B" : "#E6E7E5",
+                borderRadius: 99, transition: "background 0.3s",
+              }} />
             )}
           </div>
         );
@@ -164,15 +235,7 @@ function StepBar({ current }: { current: number }) {
 
 // ─── Step 1 — Datos básicos ───────────────────────────────────────────────────
 
-function Step1({
-  data,
-  onChange,
-  errors,
-}: {
-  data: ObraFormData;
-  onChange: (d: ObraFormData) => void;
-  errors: Record<string, string>;
-}) {
+function Step1({ data, onChange, errors }: { data: ObraFormData; onChange: (d: ObraFormData) => void; errors: Record<string, string> }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(data.image_url || null);
   const [uploading, setUploading] = useState(false);
@@ -185,31 +248,17 @@ function Step1({
   }
 
   async function handleFile(file: File) {
-    if (!file.type.startsWith("image/")) {
-      setUploadError("Solo se aceptan imágenes (JPG, PNG, WebP).");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("La imagen no puede superar 5 MB.");
-      return;
-    }
-
+    if (!file.type.startsWith("image/")) { setUploadError("Solo se aceptan imágenes (JPG, PNG, WebP)."); return; }
+    if (file.size > 5 * 1024 * 1024) { setUploadError("La imagen no puede superar 5 MB."); return; }
     const localUrl = URL.createObjectURL(file);
-    setPreview(localUrl);
-    setImgLoadError(false);
-    setUploadError(null);
-    setUploading(true);
-
+    setPreview(localUrl); setImgLoadError(false); setUploadError(null); setUploading(true);
     try {
       const url = await uploadImage(file);
       onChange({ ...data, image_url: url });
     } catch {
       setUploadError("Error al subir la imagen. Intentá de nuevo.");
-      setPreview(null);
-      onChange({ ...data, image_url: "" });
-    } finally {
-      setUploading(false);
-    }
+      setPreview(null); onChange({ ...data, image_url: "" });
+    } finally { setUploading(false); }
   }
 
   function handleInputChange(e: ChangeEvent<HTMLInputElement>) {
@@ -225,139 +274,104 @@ function Step1({
   }
 
   function clearImage() {
-    setPreview(null);
-    setUploadError(null);
-    onChange({ ...data, image_url: "" });
+    setPreview(null); setUploadError(null); onChange({ ...data, image_url: "" });
   }
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <FieldLabel>Nombre de la obra</FieldLabel>
-        <input
-          className={inputCls(!!errors.name)}
-          placeholder="Ej: Edificio Palermo III"
-          value={data.name}
-          onChange={set("name")}
-          maxLength={255}
-          autoFocus
-        />
+        <input style={iStyle(!!errors.name)} placeholder="Ej: Edificio Palermo III"
+          value={data.name} onChange={set("name")} maxLength={255} autoFocus
+          onFocus={e => onFocus(e, !!errors.name)} onBlur={e => onBlur(e, !!errors.name)} />
         <FieldError msg={errors.name} />
       </div>
 
       <div>
         <FieldLabel>Ubicación</FieldLabel>
-        <input
-          className={inputCls(!!errors.location)}
-          placeholder="Ej: Av. Santa Fe 1500, CABA"
-          value={data.location}
-          onChange={set("location")}
-          maxLength={255}
-        />
+        <input style={iStyle(!!errors.location)} placeholder="Ej: Av. Santa Fe 1500, CABA"
+          value={data.location} onChange={set("location")} maxLength={255}
+          onFocus={e => onFocus(e, !!errors.location)} onBlur={e => onBlur(e, !!errors.location)} />
         <FieldError msg={errors.location} />
       </div>
 
       <div>
         <FieldLabel optional>Descripción</FieldLabel>
-        <textarea
-          className={[inputCls(), "resize-none"].join(" ")}
-          placeholder="Descripción breve del proyecto..."
-          rows={2}
-          value={data.description}
-          onChange={set("description")}
-        />
+        <textarea style={{ ...iStyle(), resize: "none" } as React.CSSProperties}
+          placeholder="Descripción breve del proyecto..." rows={2}
+          value={data.description} onChange={set("description")}
+          onFocus={onFocus} onBlur={onBlur} />
       </div>
 
       {/* Image upload */}
       <div>
         <FieldLabel optional>Foto de la obra</FieldLabel>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={handleInputChange}
-        />
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp"
+          style={{ display: "none" }} onChange={handleInputChange} />
 
         {preview && !imgLoadError ? (
-          <div className="relative h-36 rounded overflow-hidden border border-constructa-border group">
-            <img
-              src={preview}
-              alt="Preview"
-              className="w-full h-full object-cover"
-              onError={() => setImgLoadError(true)}
-            />
+          <div style={{ position: "relative", height: 140, borderRadius: 12, overflow: "hidden", border: "1px solid #E6E7E5" }}>
+            <img src={preview} alt="Preview" onError={() => setImgLoadError(true)}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             {uploading ? (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
-                <Loader2 className="w-5 h-5 text-white animate-spin" />
-                <span className="text-white text-xs font-mono">Subiendo...</span>
+              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.50)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <Loader2 style={{ width: 18, height: 18, color: "#fff", animation: "spin 1s linear infinite" }} />
+                <span style={{ color: "#fff", fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>Subiendo...</span>
               </div>
             ) : (
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="text-xs text-white bg-black/60 hover:bg-black/80 px-3 py-1.5 rounded transition-colors font-mono"
-                >
+              <div className="img-hover-overlay" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "rgba(0,0,0,0)", transition: "background 0.2s" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.30)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,0,0,0)")}>
+                <button type="button" onClick={() => fileRef.current?.click()}
+                  style={{ fontSize: 11, color: "#fff", background: "rgba(0,0,0,0.6)", padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600 }}>
                   Cambiar
                 </button>
-                <button
-                  type="button"
-                  onClick={clearImage}
-                  className="p-1.5 bg-black/60 hover:bg-constructa-danger/80 rounded transition-colors"
-                >
-                  <X className="w-3.5 h-3.5 text-white" />
+                <button type="button" onClick={clearImage}
+                  style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(0,0,0,0.6)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+                  <X style={{ width: 12, height: 12 }} />
                 </button>
               </div>
             )}
           </div>
         ) : (
           <div
-            role="button"
-            tabIndex={0}
+            role="button" tabIndex={0}
             onClick={() => fileRef.current?.click()}
-            onKeyDown={(e) => e.key === "Enter" && fileRef.current?.click()}
-            onDragOver={(e) => e.preventDefault()}
+            onKeyDown={e => e.key === "Enter" && fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
             onDrop={handleDrop}
-            className="h-36 rounded border-2 border-dashed border-constructa-border hover:border-constructa-primary cursor-pointer flex flex-col items-center justify-center gap-2 transition-colors group bg-constructa-surface/40"
+            style={{
+              height: 130, borderRadius: 12, border: "1.5px dashed #C7CAC6",
+              cursor: "pointer", display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 10,
+              background: "#F9FAF8", transition: "border-color 0.15s, background 0.15s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#FF6B35"; (e.currentTarget as HTMLElement).style.background = "rgba(255,107,53,0.03)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#C7CAC6"; (e.currentTarget as HTMLElement).style.background = "#F9FAF8"; }}
           >
-            {imgLoadError ? (
-              <ImageOff className="w-6 h-6 text-constructa-border" />
-            ) : (
-              <Upload className="w-6 h-6 text-constructa-border group-hover:text-constructa-primary transition-colors" />
-            )}
-            <div className="text-center">
-              <p className="text-xs text-constructa-text font-semibold">
-                Hacé click o arrastrá una foto
-              </p>
-              <p className="text-[10px] text-constructa-border mt-0.5 font-mono">
-                JPG · PNG · WebP — máx. 5 MB
-              </p>
+            {imgLoadError
+              ? <ImageOff style={{ width: 22, height: 22, color: "#C7CAC6" }} />
+              : <Upload style={{ width: 22, height: 22, color: "#ADAAA4" }} />
+            }
+            <div style={{ textAlign: "center" }}>
+              <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "#5B6770", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Hacé click o arrastrá una foto</p>
+              <p style={{ margin: "3px 0 0", fontSize: 10.5, color: "#ADAAA4", fontFamily: "'JetBrains Mono', monospace" }}>JPG · PNG · WebP — máx. 5 MB</p>
             </div>
           </div>
         )}
-
         {uploadError && <FieldError msg={uploadError} />}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div>
           <FieldLabel optional>Fecha de inicio</FieldLabel>
-          <input
-            type="date"
-            className={inputCls()}
-            value={data.start_date}
-            onChange={set("start_date")}
-          />
+          <input type="date" style={iStyle()} value={data.start_date} onChange={set("start_date")}
+            onFocus={onFocus} onBlur={onBlur} />
         </div>
         <div>
           <FieldLabel optional>Fecha estimada de fin</FieldLabel>
-          <input
-            type="date"
-            className={inputCls(!!errors.expected_end_date)}
-            value={data.expected_end_date}
-            onChange={set("expected_end_date")}
-          />
+          <input type="date" style={iStyle(!!errors.expected_end_date)} value={data.expected_end_date} onChange={set("expected_end_date")}
+            onFocus={e => onFocus(e, !!errors.expected_end_date)} onBlur={e => onBlur(e, !!errors.expected_end_date)} />
           <FieldError msg={errors.expected_end_date} />
         </div>
       </div>
@@ -367,145 +381,88 @@ function Step1({
 
 // ─── Step 2 — Responsables ────────────────────────────────────────────────────
 
-function Step2({
-  responsibles,
-  form,
-  onFormChange,
-  error,
-  onAdd,
-  onRemove,
-  onEdit,
-}: {
-  responsibles: DraftResponsible[];
-  form: RespForm;
-  onFormChange: (f: RespForm) => void;
-  error: string | null;
-  onAdd: () => void;
-  onRemove: (k: string) => void;
-  onEdit: (k: string) => void;
+function Step2({ responsibles, form, onFormChange, error, onAdd, onRemove, onEdit }: {
+  responsibles: DraftResponsible[]; form: RespForm; onFormChange: (f: RespForm) => void;
+  error: string | null; onAdd: () => void; onRemove: (k: string) => void; onEdit: (k: string) => void;
 }) {
   function set(field: keyof RespForm) {
-    return (e: ChangeEvent<HTMLInputElement>) =>
-      onFormChange({ ...form, [field]: e.target.value });
+    return (e: ChangeEvent<HTMLInputElement>) => onFormChange({ ...form, [field]: e.target.value });
   }
-
   function handleKey(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      onAdd();
-    }
+    if (e.key === "Enter") { e.preventDefault(); onAdd(); }
   }
 
   return (
-    <div className="space-y-5">
-      <p className="text-sm text-constructa-secondaryText">
-        Agregá las personas responsables de esta obra. Podés omitir este paso y
-        agregarlos después.
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <p style={{ margin: 0, fontSize: 13, color: "#5B6770", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        Agregá las personas responsables. Podés omitir este paso y agregarlos después.
       </p>
 
       {/* Add form */}
-      <div className="bg-white border border-constructa-border rounded p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div style={{ background: "#F9FAF8", border: "1px solid #E6E7E5", borderRadius: 12, padding: "16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
             <FieldLabel>Nombre</FieldLabel>
-            <input
-              className={inputCls()}
-              placeholder="Juan Pérez"
-              value={form.full_name}
-              onChange={set("full_name")}
-              onKeyDown={handleKey}
-              maxLength={255}
-            />
+            <input style={iStyle()} placeholder="Juan Pérez" value={form.full_name}
+              onChange={set("full_name")} onKeyDown={handleKey} maxLength={255}
+              onFocus={onFocus} onBlur={onBlur} />
           </div>
           <div>
             <FieldLabel>WhatsApp</FieldLabel>
-            <input
-              className={inputCls()}
-              placeholder="+5491112345678"
-              value={form.whatsapp_number}
-              onChange={set("whatsapp_number")}
-              onKeyDown={handleKey}
-            />
+            <input style={iStyle()} placeholder="+5491112345678" value={form.whatsapp_number}
+              onChange={set("whatsapp_number")} onKeyDown={handleKey}
+              onFocus={onFocus} onBlur={onBlur} />
           </div>
           <div>
             <FieldLabel optional>Rol</FieldLabel>
-            <input
-              className={inputCls()}
-              placeholder="Capataz, Electricista..."
-              value={form.role}
-              onChange={set("role")}
-              onKeyDown={handleKey}
-              maxLength={100}
-            />
+            <input style={iStyle()} placeholder="Capataz, Electricista..." value={form.role}
+              onChange={set("role")} onKeyDown={handleKey} maxLength={100}
+              onFocus={onFocus} onBlur={onBlur} />
           </div>
         </div>
-
-        <InlineError msg={error} />
-
-        <div className="flex justify-end">
-          <Button variant="primary" type="button" onClick={onAdd}>
-            <Plus className="w-4 h-4" />
+        {error && <div style={{ marginBottom: 10 }}><InlineError msg={error} /></div>}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <PrimaryBtn onClick={onAdd}>
+            <Plus style={{ width: 13, height: 13 }} />
             Agregar responsable
-          </Button>
+          </PrimaryBtn>
         </div>
       </div>
 
-      {/* List — fixed height so modal never resizes */}
-      <div className="min-h-[220px] max-h-[220px] overflow-y-auto pr-1">
+      {/* List */}
+      <div style={{ minHeight: 200, maxHeight: 200, overflowY: "auto" }}>
         {responsibles.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText">
-              {responsibles.length} responsable
-              {responsibles.length !== 1 ? "s" : ""} agregado
-              {responsibles.length !== 1 ? "s" : ""}
-            </p>
-            {responsibles.map((r) => (
-            <div
-              key={r._key}
-              className="flex items-center gap-3 bg-white border border-constructa-border rounded px-4 py-3"
-            >
-              <div className="w-8 h-8 rounded-full bg-constructa-surface flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-constructa-secondaryText">
-                  {r.full_name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-constructa-text truncate">
-                  {r.full_name}
-                </p>
-                <p className="text-xs text-constructa-secondaryText font-mono">
-                  {r.whatsapp_number}
-                </p>
-              </div>
-              {r.role && (
-                <span className="hidden sm:block text-xs text-constructa-secondaryText bg-constructa-surface px-2 py-0.5 rounded">
-                  {r.role}
-                </span>
-              )}
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button
-                  onClick={() => onEdit(r._key)}
-                  title="Editar"
-                  className="p-1.5 rounded text-constructa-secondaryText hover:text-constructa-info hover:bg-blue-50 transition-colors"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => onRemove(r._key)}
-                  title="Quitar"
-                  className="p-1.5 rounded text-constructa-secondaryText hover:text-constructa-danger hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#8E97A0", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 2 }}>
+              {responsibles.length} responsable{responsibles.length !== 1 ? "s" : ""} agregado{responsibles.length !== 1 ? "s" : ""}
+            </span>
+            {responsibles.map(r => {
+              const color = avatarColor(r.full_name);
+              return (
+                <div key={r._key} style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #E6E7E5", borderRadius: 12, padding: "10px 14px" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 99, background: color, color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {getInitials(r.full_name)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1A2329", fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.full_name}</p>
+                    <p style={{ margin: "1px 0 0", fontSize: 11.5, color: "#8E97A0", fontFamily: "'JetBrains Mono', monospace" }}>{r.whatsapp_number}</p>
+                  </div>
+                  {r.role && (
+                    <span style={{ fontSize: 11, color: "#5B6770", background: "#F0F1EF", padding: "3px 8px", borderRadius: 99, border: "1px solid #E6E7E5", whiteSpace: "nowrap", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      {r.role}
+                    </span>
+                  )}
+                  <div style={{ display: "flex", gap: 2 }}>
+                    <SmallIconBtn onClick={() => onEdit(r._key)} title="Editar"><Pencil style={{ width: 12, height: 12 }} /></SmallIconBtn>
+                    <SmallIconBtn onClick={() => onRemove(r._key)} title="Quitar" danger><Trash2 style={{ width: 12, height: 12 }} /></SmallIconBtn>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-xs text-constructa-secondaryText text-center">
-              Sin responsables todavía — podés continuar y agregarlos después.
-            </p>
+          <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <p style={{ fontSize: 12.5, color: "#8E97A0", textAlign: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Sin responsables todavía — podés continuar y agregarlos después.</p>
           </div>
         )}
       </div>
@@ -515,188 +472,110 @@ function Step2({
 
 // ─── Step 3 — Tareas ──────────────────────────────────────────────────────────
 
-function Step3({
-  tasks,
-  responsibles,
-  form,
-  onFormChange,
-  error,
-  onAdd,
-  onRemove,
-  onEdit,
-}: {
-  tasks: DraftTask[];
-  responsibles: DraftResponsible[];
-  form: TaskForm;
-  onFormChange: (f: TaskForm) => void;
-  error: string | null;
-  onAdd: () => void;
-  onRemove: (k: string) => void;
-  onEdit: (k: string) => void;
+function Step3({ tasks, responsibles, form, onFormChange, error, onAdd, onRemove, onEdit }: {
+  tasks: DraftTask[]; responsibles: DraftResponsible[]; form: TaskForm;
+  onFormChange: (f: TaskForm) => void; error: string | null;
+  onAdd: () => void; onRemove: (k: string) => void; onEdit: (k: string) => void;
 }) {
   function set(field: keyof TaskForm) {
-    return (
-      e: ChangeEvent<
-        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-      >
-    ) => onFormChange({ ...form, [field]: e.target.value });
+    return (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      onFormChange({ ...form, [field]: e.target.value });
   }
-
   function handleKey(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      onAdd();
-    }
+    if (e.key === "Enter") { e.preventDefault(); onAdd(); }
   }
 
   return (
-    <div className="space-y-5">
-      <p className="text-sm text-constructa-secondaryText">
-        Definí las tareas iniciales. Las tareas sin responsable asignado
-        mostrarán una advertencia — podés asignarlos después.
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <p style={{ margin: 0, fontSize: 13, color: "#5B6770", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        Definí las tareas iniciales. Podés asignar responsables después desde el detalle de la obra.
       </p>
 
       {/* Add form */}
-      <div className="bg-white border border-constructa-border rounded p-4 space-y-3">
-        <div>
+      <div style={{ background: "#F9FAF8", border: "1px solid #E6E7E5", borderRadius: 12, padding: "16px" }}>
+        <div style={{ marginBottom: 10 }}>
           <FieldLabel>Título de la tarea</FieldLabel>
-          <input
-            className={inputCls()}
-            placeholder="Ej: Excavación y nivelación del terreno"
-            value={form.title}
-            onChange={set("title")}
-            onKeyDown={handleKey}
-            maxLength={255}
-          />
+          <input style={iStyle()} placeholder="Ej: Excavación y nivelación del terreno"
+            value={form.title} onChange={set("title")} onKeyDown={handleKey} maxLength={255}
+            onFocus={onFocus} onBlur={onBlur} />
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
           <div>
             <FieldLabel optional>Responsable</FieldLabel>
-            <select
-              className={[inputCls(), "cursor-pointer"].join(" ")}
-              value={form.responsible_key}
-              onChange={set("responsible_key")}
-            >
+            <select style={{ ...iStyle(), cursor: "pointer", appearance: "none" } as React.CSSProperties}
+              value={form.responsible_key} onChange={set("responsible_key")}
+              onFocus={onFocus} onBlur={onBlur}>
               <option value="">Sin responsable</option>
-              {responsibles.map((r) => (
-                <option key={r._key} value={r._key}>
-                  {r.full_name}
-                  {r.role ? ` · ${r.role}` : ""}
-                </option>
-              ))}
+              {responsibles.map(r => <option key={r._key} value={r._key}>{r.full_name}{r.role ? ` · ${r.role}` : ""}</option>)}
             </select>
           </div>
           <div>
             <FieldLabel optional>Fecha inicio</FieldLabel>
-            <input
-              type="date"
-              className={inputCls()}
-              value={form.start_date}
-              onChange={set("start_date")}
-            />
+            <input type="date" style={iStyle()} value={form.start_date} onChange={set("start_date")}
+              onFocus={onFocus} onBlur={onBlur} />
           </div>
           <div>
             <FieldLabel optional>Fecha vencimiento</FieldLabel>
-            <input
-              type="date"
-              className={inputCls()}
-              value={form.due_date}
-              onChange={set("due_date")}
-            />
+            <input type="date" style={iStyle()} value={form.due_date} onChange={set("due_date")}
+              onFocus={onFocus} onBlur={onBlur} />
           </div>
         </div>
-
-        <div>
+        <div style={{ marginBottom: 10 }}>
           <FieldLabel optional>Descripción</FieldLabel>
-          <textarea
-            className={[inputCls(), "resize-none"].join(" ")}
-            placeholder="Descripción adicional..."
-            rows={2}
-            value={form.description}
-            onChange={set("description")}
-          />
+          <textarea style={{ ...iStyle(), resize: "none" } as React.CSSProperties}
+            placeholder="Descripción adicional..." rows={2}
+            value={form.description} onChange={set("description")}
+            onFocus={onFocus} onBlur={onBlur} />
         </div>
-
-        <InlineError msg={error} />
-
-        <div className="flex justify-end">
-          <Button variant="primary" type="button" onClick={onAdd}>
-            <Plus className="w-4 h-4" />
+        {error && <div style={{ marginBottom: 10 }}><InlineError msg={error} /></div>}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <PrimaryBtn onClick={onAdd}>
+            <Plus style={{ width: 13, height: 13 }} />
             Agregar tarea
-          </Button>
+          </PrimaryBtn>
         </div>
       </div>
 
-      {/* List — fixed height so modal never resizes */}
-      <div className="min-h-[220px] max-h-[220px] overflow-y-auto pr-1">
+      {/* List */}
+      <div style={{ minHeight: 200, maxHeight: 200, overflowY: "auto" }}>
         {tasks.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText">
-              {tasks.length} tarea{tasks.length !== 1 ? "s" : ""} agregada
-              {tasks.length !== 1 ? "s" : ""}
-            </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#8E97A0", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 2 }}>
+              {tasks.length} tarea{tasks.length !== 1 ? "s" : ""} agregada{tasks.length !== 1 ? "s" : ""}
+            </span>
             {tasks.map((t, i) => {
-            const resp = responsibles.find((r) => r._key === t.responsible_key);
-            return (
-              <div
-                key={t._key}
-                className="flex items-start gap-3 bg-white border border-constructa-border rounded px-4 py-3"
-              >
-                <span className="text-xs font-mono text-constructa-border mt-0.5 w-5 text-right flex-shrink-0">
-                  {i + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-constructa-text">
-                    {t.title}
-                  </p>
-                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                    {resp ? (
-                      <span className="text-xs text-constructa-secondaryText">
-                        {resp.full_name}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-constructa-warning">
-                        <AlertTriangle className="w-3 h-3" />
-                        Sin responsable
-                      </span>
-                    )}
-                    {(t.start_date || t.due_date) && (
-                      <span className="text-xs text-constructa-secondaryText">
-                        {t.start_date && t.due_date
-                          ? `${formatDate(t.start_date)} → ${formatDate(t.due_date)}`
-                          : t.due_date
-                          ? `Vence: ${formatDate(t.due_date)}`
-                          : `Inicio: ${formatDate(t.start_date)}`}
-                      </span>
-                    )}
+              const resp = responsibles.find(r => r._key === t.responsible_key);
+              return (
+                <div key={t._key} style={{ display: "flex", alignItems: "flex-start", gap: 12, background: "#fff", border: "1px solid #E6E7E5", borderRadius: 12, padding: "10px 14px" }}>
+                  <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "#ADAAA4", marginTop: 2, minWidth: 18, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1A2329", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{t.title}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, flexWrap: "wrap" }}>
+                      {resp ? (
+                        <span style={{ fontSize: 11.5, color: "#5B6770", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{resp.full_name}</span>
+                      ) : (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "#C97D0E", fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          <AlertTriangle style={{ width: 10, height: 10 }} />Sin responsable
+                        </span>
+                      )}
+                      {(t.start_date || t.due_date) && (
+                        <span style={{ fontSize: 11, color: "#8E97A0", fontFamily: "'JetBrains Mono', monospace" }}>
+                          {t.start_date && t.due_date ? `${formatDate(t.start_date)} → ${formatDate(t.due_date)}` : t.due_date ? `vence ${formatDate(t.due_date)}` : `inicio ${formatDate(t.start_date)}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 2 }}>
+                    <SmallIconBtn onClick={() => onEdit(t._key)} title="Editar"><Pencil style={{ width: 12, height: 12 }} /></SmallIconBtn>
+                    <SmallIconBtn onClick={() => onRemove(t._key)} title="Quitar" danger><Trash2 style={{ width: 12, height: 12 }} /></SmallIconBtn>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => onEdit(t._key)}
-                    title="Editar"
-                    className="p-1.5 rounded text-constructa-secondaryText hover:text-constructa-info hover:bg-blue-50 transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => onRemove(t._key)}
-                    title="Quitar"
-                    className="p-1.5 rounded text-constructa-secondaryText hover:text-constructa-danger hover:bg-red-50 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
               );
             })}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-xs text-constructa-secondaryText text-center">
-              Sin tareas todavía — podés continuar y agregarlas desde la obra.
-            </p>
+          <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <p style={{ fontSize: 12.5, color: "#8E97A0", textAlign: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Sin tareas todavía — podés continuar y agregarlas desde la obra.</p>
           </div>
         )}
       </div>
@@ -706,142 +585,82 @@ function Step3({
 
 // ─── Step 4 — Confirmación ────────────────────────────────────────────────────
 
-function Step4({
-  obraData,
-  responsibles,
-  tasks,
-  tasksWithoutResp,
-  error,
-}: {
-  obraData: ObraFormData;
-  responsibles: DraftResponsible[];
-  tasks: DraftTask[];
-  tasksWithoutResp: number;
-  error: string | null;
+function Step4({ obraData, responsibles, tasks, tasksWithoutResp, error }: {
+  obraData: ObraFormData; responsibles: DraftResponsible[]; tasks: DraftTask[];
+  tasksWithoutResp: number; error: string | null;
 }) {
   return (
-    <div className="space-y-5">
-      <p className="text-sm text-constructa-secondaryText">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <p style={{ margin: 0, fontSize: 13, color: "#5B6770", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         Revisá el resumen antes de crear la obra.
       </p>
 
-      {/* Summary */}
-      <div className="bg-white border-l-4 border-l-constructa-primary border border-constructa-border rounded p-5 space-y-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText mb-1">
-            Obra
-          </p>
-          <p className="text-xl font-bold text-constructa-text leading-snug">
-            {obraData.name}
-          </p>
-          {obraData.location && (
-            <p className="text-sm text-constructa-secondaryText mt-0.5">
-              {obraData.location}
-            </p>
-          )}
-          {obraData.description && (
-            <p className="text-xs text-constructa-secondaryText mt-1.5 line-clamp-2">
-              {obraData.description}
-            </p>
-          )}
+      {/* Summary card */}
+      <div style={{ background: "#fff", border: "1px solid #E6E7E5", borderLeft: "4px solid #FF6B35", borderRadius: 12, padding: "18px 20px" }}>
+        <div style={{ marginBottom: 14 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#8E97A0", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Obra</span>
+          <p style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 700, color: "#1A2329", letterSpacing: "-0.015em", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{obraData.name}</p>
+          {obraData.location && <p style={{ margin: "3px 0 0", fontSize: 13, color: "#5B6770", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{obraData.location}</p>}
+          {obraData.description && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#8E97A0", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{obraData.description}</p>}
         </div>
 
         {(obraData.start_date || obraData.expected_end_date) && (
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText mb-1">
-              Período
-            </p>
-            <p className="text-sm text-constructa-text">
-              {formatDate(obraData.start_date)} →{" "}
-              {formatDate(obraData.expected_end_date)}
+          <div style={{ marginBottom: 14 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#8E97A0", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Período</span>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#1A2329", fontFamily: "'JetBrains Mono', monospace" }}>
+              {formatDate(obraData.start_date)} → {formatDate(obraData.expected_end_date)}
             </p>
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-0 pt-3 border-t border-constructa-surface">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", paddingTop: 14, borderTop: "1px solid #F0F1EF", gap: 0 }}>
           {[
-            {
-              value: responsibles.length,
-              label: "Responsables",
-              color: "text-constructa-text",
-            },
-            {
-              value: tasks.length,
-              label: "Tareas",
-              color: "text-constructa-text",
-            },
-            {
-              value: tasksWithoutResp,
-              label: "Sin responsable",
-              color:
-                tasksWithoutResp > 0
-                  ? "text-constructa-warning"
-                  : "text-constructa-success",
-            },
+            { value: responsibles.length, label: "Responsables", color: "#1A2329" },
+            { value: tasks.length, label: "Tareas", color: "#1A2329" },
+            { value: tasksWithoutResp, label: "Sin responsable", color: tasksWithoutResp > 0 ? "#C97D0E" : "#1F8A5B" },
           ].map(({ value, label, color }) => (
-            <div key={label} className="text-center">
-              <p className={`text-3xl font-bold ${color}`}>{value}</p>
-              <p className="text-xs text-constructa-secondaryText mt-0.5">
-                {label}
-              </p>
+            <div key={label} style={{ textAlign: "center" }}>
+              <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: "-0.025em" }}>{value}</p>
+              <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "#8E97A0", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Warnings */}
       {tasksWithoutResp > 0 && (
-        <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded px-4 py-3">
-          <AlertTriangle className="w-4 h-4 text-constructa-warning flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700">
-            <span className="font-bold">
-              {tasksWithoutResp} tarea{tasksWithoutResp > 1 ? "s" : ""} sin
-              responsable.
-            </span>{" "}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "#FDF1DE", border: "1px solid #E89B14", borderRadius: 10, padding: "10px 14px" }}>
+          <AlertTriangle style={{ width: 13, height: 13, color: "#C97D0E", flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 12, color: "#8B5E0A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <strong>{tasksWithoutResp} tarea{tasksWithoutResp > 1 ? "s" : ""} sin responsable.</strong>{" "}
             Podés asignarlos después desde el detalle de la obra.
           </p>
         </div>
       )}
 
-      {error && (
-        <div className="flex items-start gap-2.5 bg-red-50 border border-constructa-danger/30 rounded px-4 py-3">
-          <AlertTriangle className="w-4 h-4 text-constructa-danger flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-constructa-danger">{error}</p>
-        </div>
-      )}
+      {error && <InlineError msg={error} />}
     </div>
   );
 }
 
 // ─── Success view ─────────────────────────────────────────────────────────────
 
-function SuccessView({
-  obra,
-  onNavigate,
-}: {
-  obra: Obra;
-  onNavigate: () => void;
-}) {
+function SuccessView({ obra, onNavigate }: { obra: Obra; onNavigate: () => void }) {
   return (
-    <div className="flex flex-col items-center text-center py-8 gap-5">
-      <div className="w-16 h-16 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center">
-        <CheckCircle2 className="w-8 h-8 text-constructa-success" />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "32px 0", gap: 20 }}>
+      <div style={{ width: 64, height: 64, borderRadius: 99, background: "#E4F3EC", border: "2px solid #A8DFC5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <CheckCircle2 style={{ width: 30, height: 30, color: "#1F8A5B" }} />
       </div>
       <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-constructa-secondaryText mb-1">
+        <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#1F8A5B", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 6 }}>
           Obra creada exitosamente
         </p>
-        <h3 className="text-xl font-bold text-constructa-text">{obra.name}</h3>
-        {obra.location && (
-          <p className="text-sm text-constructa-secondaryText mt-0.5">
-            {obra.location}
-          </p>
-        )}
+        <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1A2329", letterSpacing: "-0.02em", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{obra.name}</h3>
+        {obra.location && <p style={{ margin: "4px 0 0", fontSize: 13, color: "#5B6770", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{obra.location}</p>}
       </div>
-      <Button variant="primary" onClick={onNavigate} className="px-8 mt-2">
+      <PrimaryBtn onClick={onNavigate}>
         Ir a la obra
-        <ChevronRight className="w-4 h-4" />
-      </Button>
+        <ChevronRight style={{ width: 14, height: 14 }} />
+      </PrimaryBtn>
     </div>
   );
 }
@@ -858,222 +677,98 @@ export function ObraSetupWizard({ onClose, onCreated }: ObraSetupWizardProps) {
   const [done, setDone] = useState(false);
   const [createdObra, setCreatedObra] = useState<Obra | null>(null);
 
-  // Step 1
-  const [obraData, setObraData] = useState<ObraFormData>({
-    name: "",
-    location: "",
-    description: "",
-    image_url: "",
-    start_date: "",
-    expected_end_date: "",
-  });
+  const [obraData, setObraData] = useState<ObraFormData>({ name: "", location: "", description: "", image_url: "", start_date: "", expected_end_date: "" });
   const [step1Errors, setStep1Errors] = useState<Record<string, string>>({});
 
-  // Step 2
   const [responsibles, setResponsibles] = useState<DraftResponsible[]>([]);
-  const [respForm, setRespForm] = useState<RespForm>({
-    full_name: "",
-    whatsapp_number: "",
-    role: "",
-  });
+  const [respForm, setRespForm] = useState<RespForm>({ full_name: "", whatsapp_number: "", role: "" });
   const [respError, setRespError] = useState<string | null>(null);
 
-  // Step 3
   const [tasks, setTasks] = useState<DraftTask[]>([]);
-  const [taskForm, setTaskForm] = useState<TaskForm>({
-    title: "",
-    description: "",
-    responsible_key: "",
-    start_date: "",
-    due_date: "",
-  });
+  const [taskForm, setTaskForm] = useState<TaskForm>({ title: "", description: "", responsible_key: "", start_date: "", due_date: "" });
   const [taskError, setTaskError] = useState<string | null>(null);
 
-  // Step 4
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // ── Step 1 ────────────────────────────────────────────────────────────────
-
   function validateStep1() {
     const errs: Record<string, string> = {};
-    if (!obraData.name.trim() || obraData.name.trim().length < 2)
-      errs.name = "El nombre es obligatorio (mínimo 2 caracteres).";
-    if (!obraData.location.trim())
-      errs.location = "La ubicación es obligatoria.";
-    if (
-      obraData.start_date &&
-      obraData.expected_end_date &&
-      obraData.expected_end_date < obraData.start_date
-    )
-      errs.expected_end_date =
-        "La fecha de fin debe ser posterior a la de inicio.";
+    if (!obraData.name.trim() || obraData.name.trim().length < 2) errs.name = "El nombre es obligatorio (mínimo 2 caracteres).";
+    if (!obraData.location.trim()) errs.location = "La ubicación es obligatoria.";
+    if (obraData.start_date && obraData.expected_end_date && obraData.expected_end_date < obraData.start_date)
+      errs.expected_end_date = "La fecha de fin debe ser posterior a la de inicio.";
     setStep1Errors(errs);
     return Object.keys(errs).length === 0;
   }
 
-  function goNext() {
-    if (step === 1 && !validateStep1()) return;
-    setStep((s) => s + 1);
-  }
-
-  function goBack() {
-    setStep((s) => s - 1);
-  }
-
-  // ── Step 2 handlers ───────────────────────────────────────────────────────
+  function goNext() { if (step === 1 && !validateStep1()) return; setStep(s => s + 1); }
+  function goBack() { setStep(s => s - 1); }
 
   function addResponsible() {
     const { full_name, whatsapp_number, role } = respForm;
-    if (!full_name.trim() || full_name.trim().length < 2)
-      return setRespError("El nombre es obligatorio (mínimo 2 caracteres).");
-    if (!whatsapp_number.trim())
-      return setRespError("El número de WhatsApp es obligatorio.");
-    if (!E164.test(whatsapp_number.trim()))
-      return setRespError("Formato inválido — usá E.164: +5491112345678");
-    if (responsibles.some((r) => r.whatsapp_number === whatsapp_number.trim()))
-      return setRespError("Ya existe un responsable con ese número.");
-
-    setResponsibles((prev) => [
-      ...prev,
-      {
-        _key: uid(),
-        full_name: full_name.trim(),
-        whatsapp_number: whatsapp_number.trim(),
-        role: role.trim(),
-      },
-    ]);
+    if (!full_name.trim() || full_name.trim().length < 2) return setRespError("El nombre es obligatorio (mínimo 2 caracteres).");
+    if (!whatsapp_number.trim()) return setRespError("El número de WhatsApp es obligatorio.");
+    if (!E164.test(whatsapp_number.trim())) return setRespError("Formato inválido — usá E.164: +5491112345678");
+    if (responsibles.some(r => r.whatsapp_number === whatsapp_number.trim())) return setRespError("Ya existe un responsable con ese número.");
+    setResponsibles(prev => [...prev, { _key: uid(), full_name: full_name.trim(), whatsapp_number: whatsapp_number.trim(), role: role.trim() }]);
     setRespForm({ full_name: "", whatsapp_number: "", role: "" });
     setRespError(null);
   }
 
   function removeResponsible(k: string) {
-    setResponsibles((prev) => prev.filter((r) => r._key !== k));
-    // clear reference in tasks
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.responsible_key === k ? { ...t, responsible_key: "" } : t
-      )
-    );
+    setResponsibles(prev => prev.filter(r => r._key !== k));
+    setTasks(prev => prev.map(t => t.responsible_key === k ? { ...t, responsible_key: "" } : t));
   }
 
   function editResponsible(k: string) {
-    const r = responsibles.find((r) => r._key === k);
+    const r = responsibles.find(r => r._key === k);
     if (!r) return;
-    setRespForm({
-      full_name: r.full_name,
-      whatsapp_number: r.whatsapp_number,
-      role: r.role,
-    });
-    removeResponsible(k);
-    setRespError(null);
+    setRespForm({ full_name: r.full_name, whatsapp_number: r.whatsapp_number, role: r.role });
+    removeResponsible(k); setRespError(null);
   }
-
-  // ── Step 3 handlers ───────────────────────────────────────────────────────
 
   function addTask() {
-    const { title, description, responsible_key, start_date, due_date } =
-      taskForm;
-    if (!title.trim() || title.trim().length < 2)
-      return setTaskError("El título es obligatorio (mínimo 2 caracteres).");
-    if (start_date && due_date && due_date < start_date)
-      return setTaskError(
-        "La fecha de vencimiento debe ser posterior a la de inicio."
-      );
-
-    setTasks((prev) => [
-      ...prev,
-      {
-        _key: uid(),
-        title: title.trim(),
-        description: description.trim(),
-        responsible_key,
-        start_date,
-        due_date,
-      },
-    ]);
-    setTaskForm({
-      title: "",
-      description: "",
-      responsible_key: "",
-      start_date: "",
-      due_date: "",
-    });
+    const { title, description, responsible_key, start_date, due_date } = taskForm;
+    if (!title.trim() || title.trim().length < 2) return setTaskError("El título es obligatorio (mínimo 2 caracteres).");
+    if (start_date && due_date && due_date < start_date) return setTaskError("La fecha de vencimiento debe ser posterior a la de inicio.");
+    setTasks(prev => [...prev, { _key: uid(), title: title.trim(), description: description.trim(), responsible_key, start_date, due_date }]);
+    setTaskForm({ title: "", description: "", responsible_key: "", start_date: "", due_date: "" });
     setTaskError(null);
   }
 
-  function removeTask(k: string) {
-    setTasks((prev) => prev.filter((t) => t._key !== k));
-  }
+  function removeTask(k: string) { setTasks(prev => prev.filter(t => t._key !== k)); }
 
   function editTask(k: string) {
-    const t = tasks.find((t) => t._key === k);
+    const t = tasks.find(t => t._key === k);
     if (!t) return;
-    setTaskForm({
-      title: t.title,
-      description: t.description,
-      responsible_key: t.responsible_key,
-      start_date: t.start_date,
-      due_date: t.due_date,
-    });
-    removeTask(k);
-    setTaskError(null);
+    setTaskForm({ title: t.title, description: t.description, responsible_key: t.responsible_key, start_date: t.start_date, due_date: t.due_date });
+    removeTask(k); setTaskError(null);
   }
-
-  // ── Submit ────────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
-    setSubmitting(true);
-    setSubmitError(null);
+    setSubmitting(true); setSubmitError(null);
     try {
       const obra = await createObra({
-        name: obraData.name.trim(),
-        location: obraData.location.trim() || null,
-        description: obraData.description.trim() || null,
-        image_url: obraData.image_url.trim() || null,
-        start_date: obraData.start_date || null,
-        expected_end_date: obraData.expected_end_date || null,
+        name: obraData.name.trim(), location: obraData.location.trim() || null,
+        description: obraData.description.trim() || null, image_url: obraData.image_url.trim() || null,
+        start_date: obraData.start_date || null, expected_end_date: obraData.expected_end_date || null,
       });
-
       const keyToId = new Map<string, number>();
       for (const r of responsibles) {
-        const created = await createResponsible({
-          full_name: r.full_name,
-          whatsapp_number: r.whatsapp_number,
-          role: r.role || null,
-        });
+        const created = await createResponsible({ full_name: r.full_name, whatsapp_number: r.whatsapp_number, role: r.role || null });
         keyToId.set(r._key, created.id);
       }
-
       for (let i = 0; i < tasks.length; i++) {
         const t = tasks[i];
-        await createTask({
-          obra_id: obra.id,
-          title: t.title,
-          description: t.description || null,
-          responsible_id: t.responsible_key
-            ? (keyToId.get(t.responsible_key) ?? null)
-            : null,
-          start_date: t.start_date || null,
-          due_date: t.due_date || null,
-          order_index: i,
-        });
+        await createTask({ obra_id: obra.id, title: t.title, description: t.description || null, responsible_id: t.responsible_key ? (keyToId.get(t.responsible_key) ?? null) : null, start_date: t.start_date || null, due_date: t.due_date || null, order_index: i });
       }
-
-      setCreatedObra(obra);
-      setDone(true);
+      setCreatedObra(obra); setDone(true);
     } catch {
-      setSubmitError(
-        "Error al crear la obra. Verificá los datos e intentá nuevamente."
-      );
-    } finally {
-      setSubmitting(false);
-    }
+      setSubmitError("Error al crear la obra. Verificá los datos e intentá nuevamente.");
+    } finally { setSubmitting(false); }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
-  const tasksWithoutResp = tasks.filter((t) => !t.responsible_key).length;
+  const tasksWithoutResp = tasks.filter(t => !t.responsible_key).length;
 
   function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) onClose();
@@ -1081,118 +776,112 @@ export function ObraSetupWizard({ onClose, onCreated }: ObraSetupWizardProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
       onClick={handleBackdropClick}
+      style={{
+        position: "fixed", inset: 0, zIndex: 50,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: "rgba(15,22,28,0.55)", backdropFilter: "blur(4px)",
+        padding: 16,
+      }}
     >
-      <div className="bg-constructa-bg w-full max-w-2xl rounded-lg shadow-card-md flex flex-col h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="bg-constructa-dark px-6 py-4 rounded-t-lg flex items-center justify-between flex-shrink-0">
-          <div>
-            <p className="text-white/50 text-xs font-semibold uppercase tracking-widest">
-              {done ? "Obra creada" : `Paso ${step} de 4`}
-            </p>
-            <h2 className="text-white font-bold text-base mt-0.5">
-              {done ? "¡Listo!" : STEPS[step - 1]}
-            </h2>
+      <div style={{
+        background: "#fff", width: "100%", maxWidth: 680,
+        borderRadius: 18, display: "flex", flexDirection: "column",
+        height: "90vh", overflow: "hidden",
+        boxShadow: "0 40px 80px -20px rgba(15,22,28,0.35), 0 8px 24px -8px rgba(15,22,28,0.10)",
+        fontFamily: "'Plus Jakarta Sans', sans-serif",
+      }}>
+
+        {/* ── Header ── */}
+        <div style={{
+          background: "linear-gradient(135deg, #1B2A34 0%, #243642 100%)",
+          padding: "20px 24px",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+          flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 11, flexShrink: 0,
+              background: "linear-gradient(135deg, #FF8856 0%, #E85A26 100%)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 4px 12px -4px rgba(232,90,38,0.55)",
+            }}>
+              {done
+                ? <CheckCircle2 style={{ width: 17, height: 17, color: "#fff" }} />
+                : STEP_ICONS[step - 1]
+              }
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)" }}>
+                {done ? "Obra creada" : `Paso ${step} de 4`}
+              </p>
+              <h2 style={{ margin: "2px 0 0", fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: "-0.015em", lineHeight: 1.2 }}>
+                {done ? "¡Listo!" : STEPS[step - 1]}
+              </h2>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+            style={{
+              width: 32, height: 32, borderRadius: 9, border: "none",
+              background: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.55)",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.15s, color 0.15s", flexShrink: 0,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.18)"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.10)"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
           >
-            <X className="w-5 h-5" />
+            <X style={{ width: 15, height: 15 }} />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="px-6 py-6 flex-1 overflow-y-auto min-h-0">
+        {/* ── Content ── */}
+        <div style={{ padding: "24px 28px", flex: 1, overflowY: "auto" }}>
           {!done && <StepBar current={step} />}
-
-          {!done && step === 1 && (
-            <Step1
-              data={obraData}
-              onChange={setObraData}
-              errors={step1Errors}
-            />
-          )}
-          {!done && step === 2 && (
-            <Step2
-              responsibles={responsibles}
-              form={respForm}
-              onFormChange={setRespForm}
-              error={respError}
-              onAdd={addResponsible}
-              onRemove={removeResponsible}
-              onEdit={editResponsible}
-            />
-          )}
-          {!done && step === 3 && (
-            <Step3
-              tasks={tasks}
-              responsibles={responsibles}
-              form={taskForm}
-              onFormChange={setTaskForm}
-              error={taskError}
-              onAdd={addTask}
-              onRemove={removeTask}
-              onEdit={editTask}
-            />
-          )}
-          {!done && step === 4 && (
-            <Step4
-              obraData={obraData}
-              responsibles={responsibles}
-              tasks={tasks}
-              tasksWithoutResp={tasksWithoutResp}
-              error={submitError}
-            />
-          )}
-          {done && createdObra && (
-            <SuccessView
-              obra={createdObra}
-              onNavigate={() => onCreated(createdObra)}
-            />
-          )}
+          {!done && step === 1 && <Step1 data={obraData} onChange={setObraData} errors={step1Errors} />}
+          {!done && step === 2 && <Step2 responsibles={responsibles} form={respForm} onFormChange={setRespForm} error={respError} onAdd={addResponsible} onRemove={removeResponsible} onEdit={editResponsible} />}
+          {!done && step === 3 && <Step3 tasks={tasks} responsibles={responsibles} form={taskForm} onFormChange={setTaskForm} error={taskError} onAdd={addTask} onRemove={removeTask} onEdit={editTask} />}
+          {!done && step === 4 && <Step4 obraData={obraData} responsibles={responsibles} tasks={tasks} tasksWithoutResp={tasksWithoutResp} error={submitError} />}
+          {done && createdObra && <SuccessView obra={createdObra} onNavigate={() => onCreated(createdObra)} />}
         </div>
 
-        {/* Footer — all steps while wizard is active */}
+        {/* ── Footer ── */}
         {!done && (
-          <div className="px-6 py-4 flex items-center justify-between border-t border-constructa-border flex-shrink-0 bg-constructa-bg">
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "14px 24px 18px",
+            borderTop: "1px solid #F0F1EF",
+            flexShrink: 0, background: "#fff",
+          }}>
             <div>
               {step > 1 && (
-                <Button
-                  variant="secondary"
-                  onClick={goBack}
-                  disabled={step === 4 && submitting}
-                >
-                  <ChevronLeft className="w-4 h-4" />
+                <SecondaryBtn onClick={goBack} disabled={step === 4 && submitting}>
+                  <ChevronLeft style={{ width: 14, height: 14 }} />
                   Anterior
-                </Button>
+                </SecondaryBtn>
               )}
             </div>
+
             {step < 4 ? (
-              <Button variant="primary" onClick={goNext}>
+              <PrimaryBtn onClick={goNext}>
                 {step === 3 ? "Revisar y confirmar" : "Siguiente"}
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+                <ChevronRight style={{ width: 14, height: 14 }} />
+              </PrimaryBtn>
             ) : (
-              <Button
-                variant="primary"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="px-5"
-              >
+              <PrimaryBtn onClick={handleSubmit} disabled={submitting}>
                 {submitting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 style={{ width: 13, height: 13, animation: "spin 1s linear infinite" }} />
                     Creando obra...
                   </>
                 ) : (
                   <>
+                    <Building2 style={{ width: 13, height: 13 }} />
                     Crear obra y comenzar seguimiento
-                    <ChevronRight className="w-4 h-4" />
                   </>
                 )}
-              </Button>
+              </PrimaryBtn>
             )}
           </div>
         )}

@@ -81,8 +81,6 @@ class TaskService:
         obra = await self.obra_repo.get(obra_id)
         if not obra:
             raise NotFoundError("Obra", obra_id)
-        if obra.manager_id != manager_id:
-            raise ForbiddenError()
 
     async def _assert_responsible_active(self, responsible_id: int) -> None:
         """Block assignment of inactive responsibles.
@@ -121,7 +119,7 @@ class TaskService:
 
     # ── public methods ────────────────────────────────────────────────────────
 
-    async def create(self, data: TaskCreate, manager_id: int) -> Task:
+    async def create(self, data: TaskCreate, manager_id: int, actor: dict | None = None) -> Task:
         await self._get_obra_and_assert_access(data.obra_id, manager_id)
 
         if data.responsible_id is not None:
@@ -137,6 +135,7 @@ class TaskService:
             task_id=task.id,
             event_type="task_created",
             description=f"Task '{task.title}' created",
+            payload={"actor": actor} if actor else None,
             triggered_by="user",
         )
         return task
@@ -187,7 +186,7 @@ class TaskService:
                     task_id, AlertType.DELAY_RISK, "vencida"
                 )
 
-    async def update(self, task_id: int, data: TaskUpdate, manager_id: int) -> Task:
+    async def update(self, task_id: int, data: TaskUpdate, manager_id: int, actor: dict | None = None) -> Task:
         task = await self.get_or_raise(task_id)
         await self._get_obra_and_assert_access(task.obra_id, manager_id)
 
@@ -226,14 +225,14 @@ class TaskService:
                 task_id=task_id,
                 event_type="task_updated",
                 description=f"Tarea actualizada: {', '.join(changed_labels)}",
-                payload={"changes": real_changes},
+                payload={"changes": real_changes, **({"actor": actor} if actor else {})},
                 triggered_by="user",
             )
 
         await self._resolve_update_alerts(task_id, changes)
         return updated  # type: ignore[return-value]
 
-    async def delete(self, task_id: int, manager_id: int) -> None:
+    async def delete(self, task_id: int, manager_id: int, actor: dict | None = None) -> None:
         task = await self.get_or_raise(task_id)
         await self._get_obra_and_assert_access(task.obra_id, manager_id)
 
@@ -253,19 +252,22 @@ class TaskService:
         # Log the deletion event while the task_id FK is still valid.
         # After repo.delete() the DB ON DELETE SET NULL will null this FK on
         # the historial row, but the payload retains full traceability.
+        payload: dict = {
+            "task_id":        task_id,
+            "title":          title,
+            "responsible_id": responsible_id,
+            "status":         old_status,
+            "start_date":     start_date,
+            "due_date":       due_date,
+        }
+        if actor is not None:
+            payload["actor"] = actor
         await self.historial.log(
             obra_id=obra_id,
             task_id=task_id,
             event_type="task_deleted",
             description=f"La tarea '{title}' fue eliminada.",
-            payload={
-                "task_id":        task_id,
-                "title":          title,
-                "responsible_id": responsible_id,
-                "status":         old_status,
-                "start_date":     start_date,
-                "due_date":       due_date,
-            },
+            payload=payload,
             triggered_by="user",
         )
 

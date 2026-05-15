@@ -13,3 +13,20 @@ class UserRepository(BaseRepository[User]):
             select(User).where(User.email == email)
         )
         return result.scalar_one_or_none()
+
+    async def get_by_invitation_token(self, token: str) -> User | None:
+        result = await self.session.execute(
+            select(User).where(User.invitation_token == token)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_all(self) -> list[User]:
+        result = await self.session.execute(
+            select(User).order_by(User.created_at)
+        )
+        return list(result.scalars().all())
+
+    async def count(self) -> int:
+        from sqlalchemy import func
+        result = await self.session.execute(select(func.count()).select_from(User))
+        return result.scalar_one()

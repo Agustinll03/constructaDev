@@ -20,7 +20,9 @@ export interface Obra {
   updated_at: string;
 }
 
-export type Page = "panel" | "configuracion";
+export type Page = "panel" | "configuracion" | "equipo";
+
+export type ObraTab = "resumen" | "tareas" | "responsables" | "alertas" | "historial";
 
 export interface Responsible {
   id: number;
@@ -79,4 +81,36 @@ export interface Alert {
   message: string;
   is_read: boolean;
   created_at: string;
+}
+
+export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+
+export interface Workspace {
+  id: number;
+  name: string;
+  slug: string;
+  color: string; // hex color for workspace avatar
+  role: WorkspaceRole;
+  members_count: number;
+  created_at: string;
+}
+
+export interface WorkspaceMember {
+  id: number;
+  user_id: number;
+  name: string;
+  email: string;
+  initials: string;
+  color: string;
+  role: WorkspaceRole;
+  joined_at: string;
+}
+
+export interface CurrentUser {
+  id: number;
+  name: string;
+  email: string;
+  initials: string;
+  color: string;
+  role: "admin" | "collaborator";
 }

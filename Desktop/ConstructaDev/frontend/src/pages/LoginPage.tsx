@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { login } from "../api/auth";
+import { setToken } from "../lib/tokenStorage";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 
 interface LoginPageProps {
@@ -30,7 +31,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setLoading(true);
     try {
       const token = await login(email, password);
-      localStorage.setItem("access_token", token);
+      setToken(token);
       onLogin();
     } catch {
       setError("Credenciales inválidas. Verificá tu email y contraseña.");
