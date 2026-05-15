@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { fetchAlerts, markAlertRead } from "../api/alerts";
 import { fetchHistorial } from "../api/historial";
@@ -11,14 +11,11 @@ import { Spinner } from "../components/Spinner";
 import { TaskDeleteConfirm } from "../components/TaskDeleteConfirm";
 import { TaskFormModal } from "../components/TaskFormModal";
 import { TaskTable } from "../components/TaskTable";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
-import { SectionTitle } from "../components/ui/SectionTitle";
 import { ObraResponsablesTab } from "../components/ObraResponsablesTab";
 import { useTaskSocket } from "../hooks/useTaskSocket";
-import type { Alert, HistorialEvento, Obra, ObraStatus, Responsible, Task } from "../types";
-
-type ObraTab = "resumen" | "tareas" | "responsables" | "alertas" | "historial";
+import { useCan } from "../hooks/usePermission";
+import { useEditingSimulation } from "../hooks/useEditingSimulation";
+import type { Alert, HistorialEvento, Obra, ObraStatus, ObraTab, Responsible, Task } from "../types";
 
 // ── Visual helpers ─────────────────────────────────────────────────────────────
 
@@ -31,8 +28,6 @@ const HERO_GRADIENTS = [
   "linear-gradient(135deg, #E8B14A 0%, #C98A1F 100%)",
   "linear-gradient(135deg, #5DA8B5 0%, #3A8994 100%)",
 ];
-
-const AVATAR_COLORS = ["#2A6FDB", "#1F8A5B", "#9A4DC9", "#C97D0E", "#D03A3A", "#2C6571", "#E85A26"];
 
 const STATUS_PILL: Record<ObraStatus, { label: string; bg: string; border: string; dot: string; color: string; glow?: string }> = {
   planificada: { label: "Planificada", bg: "#F0F1EF", border: "#E6E7E5", dot: "#8E97A0", color: "#5B6770" },
@@ -54,17 +49,20 @@ function formatDate(iso: string) {
 
 interface ObraDetailPageProps {
   obra: Obra;
+  activeTab: ObraTab;
+  onTabChange: (tab: ObraTab) => void;
+  onCounts?: (counts: { tasks: number; alerts: number; responsibles: number }) => void;
 }
 
-export function ObraDetailPage({ obra }: ObraDetailPageProps) {
-  const [activeTab, setActiveTab] = useState<ObraTab>("resumen");
+export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraDetailPageProps) {
+  const can = useCan();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const editingMap   = useEditingSimulation(obra.id);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [historial, setHistorial] = useState<HistorialEvento[]>([]);
   const [responsibles, setResponsibles] = useState<Responsible[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
@@ -72,7 +70,6 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    else setRefreshing(true);
     setError(null);
     try {
       const tasksData = await fetchTasksByObra(obra.id);
@@ -85,17 +82,20 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
       setAlerts(allAlerts.filter((a) => a.obra_id === obra.id));
       setHistorial(historialData);
       setResponsibles(responsiblesData);
-    } catch {
-      setError("No se pudo conectar con el servidor. Verificá que el backend esté corriendo.");
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        setError("No tenés permiso para ver el contenido de esta obra.");
+      } else {
+        setError("No se pudo conectar con el servidor. Verificá que el backend esté corriendo.");
+      }
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [obra.id]);
 
   useEffect(() => {
     loadData();
-    setActiveTab("resumen");
   }, [loadData]);
 
   const refreshTasks = useCallback(async () => {
@@ -167,17 +167,16 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const unreadAlerts = alerts.filter((a) => !a.is_read).length;
+
+  const onCountsRef = useRef(onCounts);
+  useEffect(() => { onCountsRef.current = onCounts; });
+  useEffect(() => {
+    onCountsRef.current?.({ tasks: tasks.length, alerts: unreadAlerts, responsibles: responsibles.length });
+  }, [tasks.length, unreadAlerts, responsibles.length]);
+
   const initials = getInitials(obra.name);
   const badgeGradient = HERO_GRADIENTS[obra.id % HERO_GRADIENTS.length];
   const statusCfg = STATUS_PILL[obra.status];
-
-  const TABS: Array<{ id: ObraTab; label: string; count?: number; isAlert?: boolean }> = [
-    { id: "resumen",      label: "Resumen" },
-    { id: "tareas",       label: "Tareas",       count: tasks.length },
-    { id: "responsables", label: "Responsables", count: responsibles.length },
-    { id: "alertas",      label: "Alertas",      count: unreadAlerts, isAlert: true },
-    { id: "historial",    label: "Historial" },
-  ];
 
   // ── Tab content ─────────────────────────────────────────────────────────────
   function renderTab() {
@@ -195,9 +194,9 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
             obraExpectedEndDate={obra.expected_end_date}
             error={error}
             onMarkRead={handleMarkRead}
-            onViewAlerts={() => setActiveTab("alertas")}
-            onViewTareas={() => setActiveTab("tareas")}
-            onViewHistorial={() => setActiveTab("historial")}
+            onViewAlerts={() => onTabChange("alertas")}
+            onViewTareas={() => onTabChange("tareas")}
+            onViewHistorial={() => onTabChange("historial")}
             onEditTask={(t) => setTaskToEdit(t)}
             onTaskRescheduled={() => loadData(true)}
           />
@@ -216,41 +215,144 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
           if (!seen.has(t.id) && criticalTasks.length < 5) { seen.add(t.id); criticalTasks.push(t); }
         }
         return (
-          <div className="space-y-5">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+
+            {/* ── Tareas críticas ── */}
             {criticalTasks.length > 0 && (
-              <section>
-                <SectionTitle>Tareas críticas</SectionTitle>
-                <Card padding="none" className="overflow-hidden border border-constructa-danger/20">
-                  <ul className="divide-y divide-constructa-surface">
-                    {criticalTasks.map((t) => {
-                      const isBlocked = t.status === "bloqueada";
-                      const isOverdue = !isBlocked && isActiveFn(t) && !!t.due_date && t.due_date < TODAY_T;
-                      return (
-                        <li key={t.id} className="flex items-center gap-3 px-4 py-3 bg-red-50/40">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-constructa-text truncate" title={t.title}>{t.title}</p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {isBlocked && <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-red-100 text-constructa-danger">Bloqueada</span>}
-                            {isOverdue && <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-red-100 text-constructa-danger">Vencida</span>}
-                            {!isBlocked && !isOverdue && <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">Sin resp.</span>}
-                            <button onClick={() => setTaskToEdit(t)} title="Editar tarea" className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-constructa-secondaryText hover:text-constructa-primary hover:bg-constructa-surface transition-colors">Editar</button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </Card>
-              </section>
+              <div style={{ background: "#fff", border: "1px solid #F0B0B0", borderRadius: 14, overflow: "hidden" }}>
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", borderBottom: "1px solid #FCE5E5" }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                    background: "linear-gradient(135deg, #FCE5E5 0%, #F9CCCC 100%)",
+                    border: "1px solid #F0B0B0",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 2L14.5 13.5H1.5L8 2Z" stroke="#D03A3A" strokeWidth="1.4" fill="none" strokeLinejoin="round"/>
+                      <path d="M8 6.5v3M8 11v.5" stroke="#D03A3A" strokeWidth="1.4" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1A2329", letterSpacing: "-0.015em" }}>
+                    Tareas críticas
+                  </span>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center",
+                    padding: "2px 9px", borderRadius: 99,
+                    fontSize: 11.5, fontWeight: 600, color: "#D03A3A",
+                    background: "#FCE5E5", border: "1px solid #F0B0B0",
+                  }}>
+                    {criticalTasks.length}
+                  </span>
+                </div>
+                {/* List */}
+                <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                  {criticalTasks.map((t, idx) => {
+                    const isBlocked = t.status === "bloqueada";
+                    const isOverdue = !isBlocked && isActiveFn(t) && !!t.due_date && t.due_date < TODAY_T;
+                    return (
+                      <li key={t.id} style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        padding: "12px 20px",
+                        borderBottom: idx < criticalTasks.length - 1 ? "1px solid #FDF0F0" : "none",
+                        background: "#FFFAFA",
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: "#1A2329", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={t.title}>
+                            {t.title}
+                          </p>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          {isBlocked && (
+                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", background: "#FCE5E5", color: "#D03A3A" }}>
+                              Bloqueada
+                            </span>
+                          )}
+                          {isOverdue && (
+                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", background: "#FCE5E5", color: "#D03A3A" }}>
+                              Vencida
+                            </span>
+                          )}
+                          {!isBlocked && !isOverdue && (
+                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", background: "#FDF1DE", color: "#C97D0E" }}>
+                              Sin resp.
+                            </span>
+                          )}
+                          {can("tarea.edit") && (
+                            <button
+                              onClick={() => setTaskToEdit(t)}
+                              style={{
+                                padding: "5px 10px", borderRadius: 7, border: "1px solid #E6E7E5",
+                                fontSize: 12, fontWeight: 600, color: "#5B6770",
+                                background: "#fff", cursor: "pointer",
+                                transition: "border-color 0.15s, color 0.15s",
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = "#FF6B35"; e.currentTarget.style.color = "#FF6B35"; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = "#E6E7E5"; e.currentTarget.style.color = "#5B6770"; }}
+                            >
+                              Editar
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
-            <section>
-              <SectionTitle aside={<Button variant="primary" onClick={() => setShowCreateTask(true)} className="text-xs px-3 py-1.5"><Plus className="w-3.5 h-3.5" />Nueva tarea</Button>}>
-                Todas las tareas
-              </SectionTitle>
-              <Card padding="none" className="overflow-hidden">
-                <TaskTable tasks={tasks} responsibles={responsibles} onEdit={(t) => setTaskToEdit(t)} onDelete={(t) => setTaskToDelete(t)} />
-              </Card>
-            </section>
+
+            {/* ── Todas las tareas ── */}
+            <div style={{ background: "#fff", border: "1px solid #E6E7E5", borderRadius: 14, overflow: "hidden" }}>
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #F0F1EF" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                    background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+                    border: "1px solid #F5D5C0",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                      <rect x="1.5" y="2" width="13" height="12" rx="1.5" stroke="#E76A2D" strokeWidth="1.4" fill="none"/>
+                      <path d="M5 6h6M5 9h6M5 12h3" stroke="#E76A2D" strokeWidth="1.4" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#1A2329", letterSpacing: "-0.015em" }}>
+                    Todas las tareas
+                  </span>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center",
+                    padding: "2px 9px", borderRadius: 99,
+                    fontSize: 11.5, fontWeight: 600, color: "#5B6770",
+                    background: "#F0F1EF", border: "1px solid #E6E7E5",
+                  }}>
+                    {tasks.length} {tasks.length === 1 ? "tarea" : "tareas"}
+                  </span>
+                </div>
+                {can("tarea.create") && (
+                  <button
+                    onClick={() => setShowCreateTask(true)}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 7,
+                      padding: "8px 14px", borderRadius: 9,
+                      fontSize: 13, fontWeight: 600,
+                      background: "#FF6B35", color: "#fff",
+                      border: "none", cursor: "pointer",
+                      boxShadow: "0 4px 12px -4px rgba(255,107,53,0.5)",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#E85A26")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "#FF6B35")}
+                  >
+                    <Plus style={{ width: 13, height: 13 }} />
+                    Nueva tarea
+                  </button>
+                )}
+              </div>
+              {/* Table */}
+              <TaskTable tasks={tasks} responsibles={responsibles} onEdit={(t) => setTaskToEdit(t)} onDelete={(t) => setTaskToDelete(t)} editingMap={editingMap} />
+            </div>
+
           </div>
         );
       }
@@ -264,7 +366,7 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
             alerts={alerts} tasks={tasks}
             onMarkRead={handleMarkRead} onMarkAllRead={handleMarkAllRead}
             onViewTask={(taskId) => {
-              setActiveTab("tareas");
+              onTabChange("tareas");
               if (taskId !== undefined) { const task = tasks.find((t) => t.id === taskId); if (task) setTaskToEdit(task); }
             }}
           />
@@ -272,12 +374,37 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
 
       case "historial":
         return (
-          <section>
-            <SectionTitle aside={<span className="text-xs text-constructa-secondaryText">{historial.length} eventos</span>}>
-              Historial de actividad
-            </SectionTitle>
-            <Card padding="md"><HistorialPanel events={historial} tasks={tasks} filterable /></Card>
-          </section>
+          <div style={{ background: "#fff", border: "1px solid #E6E7E5", borderRadius: 14, overflow: "hidden", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            {/* Integrated header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", borderBottom: "1px solid #F0F1EF" }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+                border: "1px solid #F5D5C0",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6" stroke="#E76A2D" strokeWidth="1.4" fill="none"/>
+                  <path d="M8 5v3.5l2 1.5" stroke="#E76A2D" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#1A2329", letterSpacing: "-0.015em" }}>
+                Historial de actividad
+              </span>
+              <span style={{
+                display: "inline-flex", alignItems: "center",
+                padding: "2px 9px", borderRadius: 99,
+                fontSize: 11.5, fontWeight: 600, color: "#5B6770",
+                background: "#F0F1EF", border: "1px solid #E6E7E5",
+              }}>
+                {historial.length} eventos
+              </span>
+            </div>
+            {/* Panel */}
+            <div style={{ padding: "16px 20px" }}>
+              <HistorialPanel events={historial} tasks={tasks} filterable />
+            </div>
+          </div>
         );
     }
   }
@@ -389,134 +516,28 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
 
           {/* Right: avatars + actions */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, position: "relative" }}>
-            {/* Avatar stack */}
-            {responsibles.length > 0 && (
-              <div style={{ display: "flex", marginRight: 6 }}>
-                {responsibles.slice(0, 4).map((r, i) => (
-                  <div
-                    key={r.id}
-                    title={r.full_name}
-                    style={{
-                      width: 28, height: 28, borderRadius: 99,
-                      background: AVATAR_COLORS[r.id % AVATAR_COLORS.length],
-                      color: "#fff", fontWeight: 600, fontSize: 10,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      border: "2px solid #fff",
-                      marginLeft: i > 0 ? -8 : 0,
-                      zIndex: 4 - i,
-                      position: "relative",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {getInitials(r.full_name)}
-                  </div>
-                ))}
-                {responsibles.length > 4 && (
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 99,
-                    background: "#F0F1EF", color: "#5B6770",
-                    fontWeight: 600, fontSize: 10,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    border: "2px solid #fff",
-                    marginLeft: -8, position: "relative", flexShrink: 0,
-                  }}>
-                    +{responsibles.length - 4}
-                  </div>
-                )}
-              </div>
+            {/* Nueva tarea — solo en resumen */}
+            {activeTab === "resumen" && can("tarea.create") && (
+              <button
+                onClick={() => setShowCreateTask(true)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                  padding: "9px 14px", borderRadius: 10,
+                  fontSize: 13, fontWeight: 500,
+                  background: "#FF6B35", color: "#fff",
+                  border: "none", cursor: "pointer",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 6px 14px -6px rgba(255,107,53,0.5)",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#E85A26")}
+                onMouseLeave={e => (e.currentTarget.style.background = "#FF6B35")}
+              >
+                <Plus style={{ width: 13, height: 13 }} />
+                Nueva tarea
+              </button>
             )}
-
-            {/* Nueva tarea */}
-            <button
-              onClick={() => setShowCreateTask(true)}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                padding: "9px 14px", borderRadius: 10,
-                fontSize: 13, fontWeight: 500,
-                background: "#FF6B35", color: "#fff",
-                border: "none", cursor: "pointer",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 6px 14px -6px rgba(255,107,53,0.5)",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#E85A26")}
-              onMouseLeave={e => (e.currentTarget.style.background = "#FF6B35")}
-            >
-              <Plus style={{ width: 13, height: 13 }} />
-              Nueva tarea
-            </button>
           </div>
         </header>
-
-        {/* ── Tabs (segment pill) ── */}
-        <div style={{
-          display: "flex", alignItems: "center",
-          justifyContent: "space-between", gap: 16, flexWrap: "wrap",
-        }}>
-          <div style={{
-            display: "inline-flex", gap: 2,
-            background: "#fff",
-            border: "1px solid #E6E7E5",
-            padding: 4, borderRadius: 11,
-          }}>
-            {TABS.map(({ id, label, count, isAlert }) => {
-              const isActive = activeTab === id;
-              const alertActive = isAlert && isActive;
-              return (
-                <button
-                  key={id}
-                  onClick={() => setActiveTab(id)}
-                  style={{
-                    padding: "7px 14px", borderRadius: 8,
-                    fontSize: 12.5, fontWeight: 500,
-                    display: "inline-flex", alignItems: "center", gap: 7,
-                    border: "none", cursor: "pointer",
-                    transition: "background 0.15s, color 0.15s",
-                    background: alertActive ? "#FF6B35" : isActive ? "#2F3A40" : "transparent",
-                    color: isActive ? "#fff" : "#5B6770",
-                  }}
-                >
-                  {label}
-                  {count !== undefined && (
-                    <span style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: 10.5, padding: "1px 6px", borderRadius: 99,
-                      background: isActive
-                        ? "rgba(255,255,255,0.18)"
-                        : (isAlert && count > 0 ? "#FFF1E9" : "#F0F1EF"),
-                      color: isActive
-                        ? "#fff"
-                        : (isAlert && count > 0 ? "#FF6B35" : "#8E97A0"),
-                    }}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Right tools */}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => loadData(true)}
-              disabled={refreshing}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                padding: "8px 14px", borderRadius: 10,
-                fontSize: 13, fontWeight: 500, cursor: refreshing ? "default" : "pointer",
-                background: "#fff", border: "1px solid #E6E7E5", color: "#1A2329",
-                opacity: refreshing ? 0.55 : 1,
-                transition: "border-color 0.15s",
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }}>
-                <path d="M3 8a5 5 0 018.5-3.5L13 6M13 3v3h-3M13 8a5 5 0 01-8.5 3.5L3 10M3 13v-3h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Actualizar
-            </button>
-          </div>
-        </div>
 
         {/* ── Tab content ── */}
         {renderTab()}
@@ -539,7 +560,6 @@ export function ObraDetailPage({ obra }: ObraDetailPageProps) {
         <TaskDeleteConfirm task={taskToDelete} onClose={() => setTaskToDelete(null)} onDeleted={handleTaskDeleted} />
       )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   );
 }

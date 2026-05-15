@@ -64,24 +64,27 @@ class ResponsibleService:
         updated = await self.repo.update_fields(responsible_id, is_active=True)
         return updated  # type: ignore[return-value]
 
-    async def deactivate(self, responsible_id: int) -> Responsible:
+    async def deactivate(self, responsible_id: int, actor: dict | None = None) -> Responsible:
         await self.get_or_raise(responsible_id)
         updated = await self.repo.update_fields(responsible_id, is_active=False)
         affected_tasks = await self.task_repo.unassign_active_tasks_by_responsible(
             responsible_id
         )
         for task in affected_tasks:
+            payload: dict = {
+                "field": "responsible_id",
+                "from": responsible_id,
+                "to": None,
+                "reason": "responsible_deactivated",
+            }
+            if actor is not None:
+                payload["actor"] = actor
             await self.historial.log(
                 obra_id=task.obra_id,
                 task_id=task.id,
                 event_type="task_updated",
                 description="Responsable desasignado porque fue desactivado",
-                payload={
-                    "field": "responsible_id",
-                    "from": responsible_id,
-                    "to": None,
-                    "reason": "responsible_deactivated",
-                },
+                payload=payload,
                 triggered_by="user",
             )
         return updated  # type: ignore[return-value]

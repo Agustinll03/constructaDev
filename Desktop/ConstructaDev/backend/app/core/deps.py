@@ -7,24 +7,49 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.models.user import User
 
 bearer_scheme = HTTPBearer()
 
 
-async def get_current_user_id(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-) -> int:
+    db: AsyncSession = Depends(get_db),
+) -> User:
     try:
         payload = decode_access_token(credentials.credentials)
-        return int(payload["sub"])
+        user_id = int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    from app.repositories.user import UserRepository
+    user = await UserRepository(db).get(user_id)
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
+    return user
 
 
-# Reusable Annotated aliases — import these in routes instead of raw Depends()
-DbSession = Annotated[AsyncSession, Depends(get_db)]
+async def get_current_user_id(user: User = Depends(get_current_user)) -> int:
+    return user.id
+
+
+async def require_admin(user: User = Depends(get_current_user)) -> User:
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren permisos de administrador",
+        )
+    return user
+
+
+# Reusable Annotated aliases
+DbSession     = Annotated[AsyncSession, Depends(get_db)]
+CurrentUser   = Annotated[User, Depends(get_current_user)]
 CurrentUserId = Annotated[int, Depends(get_current_user_id)]
+AdminUser     = Annotated[User, Depends(require_admin)]

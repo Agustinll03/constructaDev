@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Plus, Search, Pin } from "lucide-react";
 import { fetchObras } from "../api/obras";
+import { fetchMembers, type ApiUser } from "../api/users";
+import { userAvatarColor } from "../context/UserContext";
 import { Spinner } from "../components/Spinner";
+import { usePermission } from "../hooks/usePermission";
 import type { Obra, ObraStatus } from "../types";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -53,14 +56,23 @@ function heroGradient(id: number): string {
 
 // ─── Obra card ────────────────────────────────────────────────────────────────
 
-function ObraCard({ obra, onSelect, isPinned, onTogglePin }: { obra: Obra; onSelect: () => void; isPinned: boolean; onTogglePin: () => void }) {
+function getInitials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
+}
+
+function ObraCard({ obra, onSelect, isPinned, onTogglePin, members }: { obra: Obra; onSelect: () => void; isPinned: boolean; onTogglePin: () => void; members: Map<number, ApiUser> }) {
   const [imgError, setImgError] = useState(false);
-  const pill     = STATUS_PILL[obra.status];
-  const pct      = STATUS_PCT[obra.status];
-  const barColor = PROGRESS_COLOR[obra.status];
-  const days     = daysRemaining(obra.expected_end_date);
-  const nameAbbr = obra.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
-  const hasImg   = !!obra.image_url && !imgError;
+  const pill      = STATUS_PILL[obra.status];
+  const pct       = STATUS_PCT[obra.status];
+  const barColor  = PROGRESS_COLOR[obra.status];
+  const days      = daysRemaining(obra.expected_end_date);
+  const nameAbbr  = obra.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+  const hasImg    = !!obra.image_url && !imgError;
+
+  const creator         = obra.manager_id != null ? members.get(obra.manager_id) : undefined;
+  const creatorName     = creator?.full_name || creator?.email || "?";
+  const creatorInitials = getInitials(creatorName);
+  const creatorColor    = obra.manager_id != null ? userAvatarColor(obra.manager_id) : "#8E97A0";
 
   return (
     <article
@@ -186,10 +198,10 @@ function ObraCard({ obra, onSelect, isPinned, onTogglePin }: { obra: Obra; onSel
 
       {/* Footer */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 14px", borderTop: "1px solid #E6E7E5", marginTop: "auto" }}>
-        {/* PM avatar */}
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <div style={{ width: 24, height: 24, borderRadius: 99, background: "linear-gradient(135deg,#FF8856,#E85A26)", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #fff", boxShadow: "0 1px 2px rgba(0,0,0,0.08)" }}>
-            PM
+        {/* Creator avatar */}
+        <div style={{ display: "flex", alignItems: "center" }} title={creatorName}>
+          <div style={{ width: 24, height: 24, borderRadius: 99, background: creatorColor, color: "#fff", fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #fff", boxShadow: "0 1px 2px rgba(0,0,0,0.08)", letterSpacing: "0.02em" }}>
+            {creatorInitials}
           </div>
         </div>
 
@@ -289,23 +301,33 @@ interface PortfolioPageProps {
 }
 
 export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePin }: PortfolioPageProps) {
+  const canCreateObra = usePermission("obra.create");
   const [obras,      setObras]      = useState<Obra[]>([]);
+  const [members,    setMembers]    = useState<Map<number, ApiUser>>(new Map());
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filter,     setFilter]     = useState<ObraFilter>("todas");
+  const [search,     setSearch]     = useState("");
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     setError(null);
     try {
-      setObras(await fetchObras());
+      const obrasData = await fetchObras();
+      setObras(obrasData);
     } catch {
       setError("No se pudieron cargar las obras. Verificá que el backend esté corriendo.");
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+    try {
+      const membersData = await fetchMembers();
+      setMembers(new Map(membersData.map(u => [u.id, u])));
+    } catch {
+      // Silently ignored — collaborators don't have access to member list
     }
   }, []);
 
@@ -313,7 +335,17 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
 
   const pinnedIds = new Set(pinnedObras.map(o => o.id));
   const byStatus = (s: ObraStatus) => obras.filter(o => o.status === s).length;
-  const filteredObras = filter === "todas" ? obras : obras.filter(o => o.status === filter);
+
+  const q = search.trim().toLowerCase();
+  const filteredObras = obras.filter(o => {
+    if (filter !== "todas" && o.status !== filter) return false;
+    if (!q) return true;
+    return (
+      o.name.toLowerCase().includes(q) ||
+      (o.location ?? "").toLowerCase().includes(q) ||
+      (o.description ?? "").toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div>
@@ -339,10 +371,31 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
             <input
               type="text"
               placeholder="Buscar obras…"
-              readOnly
-              style={{ paddingLeft: 32, paddingRight: 36, paddingTop: 8, paddingBottom: 8, fontSize: 12.5, background: "#fff", border: "1px solid #E6E7E5", borderRadius: 10, color: "#8E97A0", outline: "none", cursor: "default", width: 190 }}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                paddingLeft: 32, paddingRight: search ? 28 : 36,
+                paddingTop: 8, paddingBottom: 8,
+                fontSize: 12.5, background: "#fff",
+                border: `1px solid ${search ? "#FF6B35" : "#E6E7E5"}`,
+                borderRadius: 10,
+                color: search ? "#1A2329" : "#8E97A0",
+                outline: "none", cursor: "text", width: 190,
+                transition: "border-color 0.15s",
+              }}
+              onFocus={e => { if (!search) e.currentTarget.style.borderColor = "#D5D7D3"; }}
+              onBlur={e => { if (!search) e.currentTarget.style.borderColor = "#E6E7E5"; }}
             />
-            <kbd style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 9.5, fontFamily: "'JetBrains Mono', monospace", color: "#8E97A0", background: "#F4F5F4", padding: "1px 5px", borderRadius: 4, border: "1px solid #E6E7E5" }}>⌘K</kbd>
+            {search ? (
+              <button
+                onClick={() => setSearch("")}
+                style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, borderRadius: 99, background: "#C0C4C0", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", padding: 0 }}
+              >
+                <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </button>
+            ) : (
+              <kbd style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 9.5, fontFamily: "'JetBrains Mono', monospace", color: "#8E97A0", background: "#F4F5F4", padding: "1px 5px", borderRadius: 4, border: "1px solid #E6E7E5" }}>⌘K</kbd>
+            )}
           </div>
 
           {/* Refresh */}
@@ -356,15 +409,17 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
           </button>
 
           {/* Nueva obra */}
-          <button
-            onClick={onNewObra}
-            style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, background: "#FF6B35", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 1px 0 rgba(255,255,255,0.18) inset, 0 6px 14px -6px rgba(255,107,53,0.55)" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#E85A26")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#FF6B35")}
-          >
-            <Plus style={{ width: 13, height: 13 }} />
-            Nueva obra
-          </button>
+          {canCreateObra && (
+            <button
+              onClick={onNewObra}
+              style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, background: "#FF6B35", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 1px 0 rgba(255,255,255,0.18) inset, 0 6px 14px -6px rgba(255,107,53,0.55)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#E85A26")}
+              onMouseLeave={e => (e.currentTarget.style.background = "#FF6B35")}
+            >
+              <Plus style={{ width: 13, height: 13 }} />
+              Nueva obra
+            </button>
+          )}
         </div>
       </div>
 
@@ -431,13 +486,15 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
                 <p style={{ margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 15, color: "#1A2329" }}>Sin obras registradas</p>
                 <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#8E97A0" }}>Creá tu primera obra para comenzar el seguimiento.</p>
               </div>
-              <button
-                onClick={onNewObra}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, background: "#FF6B35", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 6px 14px -6px rgba(255,107,53,0.55)" }}
-              >
-                <Plus style={{ width: 13, height: 13 }} />
-                Crear primera obra
-              </button>
+              {canCreateObra && (
+                <button
+                  onClick={onNewObra}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, background: "#FF6B35", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 6px 14px -6px rgba(255,107,53,0.55)" }}
+                >
+                  <Plus style={{ width: 13, height: 13 }} />
+                  Crear primera obra
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -486,8 +543,9 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
 
               {/* ── Card grid ── */}
               {filteredObras.length === 0 ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0", background: "#fff", border: "1px solid #E6E7E5", borderRadius: 14, color: "#8E97A0", fontSize: 13 }}>
-                  No hay obras con este filtro.
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "48px 0", background: "#fff", border: "1px solid #E6E7E5", borderRadius: 14, color: "#8E97A0", fontSize: 13 }}>
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.4"/><path d="M10 10l3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                  {q ? `Sin resultados para "${search}"` : "No hay obras con este filtro."}
                 </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
@@ -498,11 +556,12 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
                       onSelect={() => onSelectObra(obra)}
                       isPinned={pinnedIds.has(obra.id)}
                       onTogglePin={() => onTogglePin(obra)}
+                      members={members}
                     />
                   ))}
 
                   {/* "Nueva obra" ghost card */}
-                  {filter === "todas" && (
+                  {filter === "todas" && canCreateObra && (
                     <article
                       onClick={onNewObra}
                       style={{

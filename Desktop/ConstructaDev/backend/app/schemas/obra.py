@@ -66,5 +66,6 @@ class ObraSummary(BaseModel):
     start_date: date | None
     expected_end_date: date | None
     actual_end_date: date | None
+    manager_id: int
 
     model_config = {"from_attributes": True}

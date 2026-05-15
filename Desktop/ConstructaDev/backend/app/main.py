@@ -2,7 +2,7 @@ import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import alerts, auth, events, notifications, obras, responsibles, tasks, uploads, webhooks
+from app.api.routes import alerts, auth, events, notifications, obras, responsibles, tasks, uploads, users, webhooks
 from app.api.routes import settings as settings_router
 from app.core.config import settings
 from app.core.socket_manager import sio
@@ -17,7 +17,10 @@ fastapi_app = FastAPI(
 
 fastapi_app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,6 +29,7 @@ fastapi_app.add_middleware(
 API_PREFIX = "/api/v1"
 
 fastapi_app.include_router(auth.router, prefix=API_PREFIX)
+fastapi_app.include_router(users.router, prefix=API_PREFIX)
 fastapi_app.include_router(obras.router, prefix=API_PREFIX)
 fastapi_app.include_router(responsibles.router, prefix=API_PREFIX)
 fastapi_app.include_router(tasks.router, prefix=API_PREFIX)

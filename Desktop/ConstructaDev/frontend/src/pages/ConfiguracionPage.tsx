@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { usePermission } from "../hooks/usePermission";
 import {
   Bell,
   Building2,
@@ -7,7 +8,6 @@ import {
   RefreshCw,
   Send,
   Server,
-  Shield,
   Wifi,
   Zap,
 } from "lucide-react";
@@ -61,25 +61,6 @@ function Switch({ checked, onChange, disabled = false }: {
         transition: ".18s", display: "block",
       }} />
     </button>
-  );
-}
-
-function SectionHead({ id, icon, title, aux }: {
-  id: string; icon: React.ReactNode; title: string; aux?: React.ReactNode;
-}) {
-  return (
-    <div id={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "6px 0 14px", scrollMarginTop: 24 }}>
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-        <span style={{ width: 3, height: 14, borderRadius: 99, background: C.secondary, flexShrink: 0 }} />
-        <span style={{ width: 22, height: 22, borderRadius: 6, background: C.secondary50, color: C.secondary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          {icon}
-        </span>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.18em", color: C.text2, textTransform: "uppercase" }}>
-          {title}
-        </span>
-      </div>
-      {aux && <div style={{ fontSize: 12, color: C.text3, display: "flex", alignItems: "center", gap: 8 }}>{aux}</div>}
-    </div>
   );
 }
 
@@ -226,7 +207,14 @@ const STATUS_COLORS: Record<StatusLevel, { border: string; iconBg: string; iconC
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const AVATAR_COLORS = ["#FF6B35", "#2A6FDB", "#1F8A5B", "#9A4DC9", "#C97D0E", "#D03A3A", "#2C6571"];
+
+function getInitials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
+}
+
 export function ConfiguracionPage() {
+  const canEdit   = usePermission("configuracion.edit");
   const [form, setForm]               = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [health, setHealth]           = useState<SystemHealth | null>(null);
   const [wsConnected, setWsConnected] = useState(socket.connected);
@@ -405,7 +393,7 @@ export function ConfiguracionPage() {
             <RefreshCw size={13} style={{ animation: healthLoading ? "spin 1s linear infinite" : "none" }} />
             Verificar ahora
           </button>
-          <button onClick={handleSave} disabled={saving || !dirty} style={{ ...btnPrimary, opacity: saving || !dirty ? 0.6 : 1 }}>
+          <button onClick={handleSave} disabled={saving || !dirty || !canEdit} style={{ ...btnPrimary, opacity: saving || !dirty || !canEdit ? 0.6 : 1 }}>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 3.5C3 2.9 3.4 2.5 4 2.5h7l2 2v8a1 1 0 01-1 1H4a1 1 0 01-1-1v-9z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><path d="M5 2.5v3.5h5V2.5M5 13.5V9h6v4.5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/></svg>
             {saving ? "Guardando…" : saveOk ? "¡Guardado!" : "Guardar cambios"}
           </button>
@@ -414,27 +402,34 @@ export function ConfiguracionPage() {
 
 
           {/* ═══ ESTADO DEL SISTEMA ═══ */}
-          <SectionHead
-            id="sistema"
-            icon={<Server size={12} />}
-            title="Estado del sistema"
-            aux={
-              <>
-                <span>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                  background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+                  border: "1px solid #F5D5C0",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Server size={15} color="#E76A2D" />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.015em", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Estado del sistema
+                </span>
+                <span style={{ fontSize: 12, color: C.text3, marginLeft: 4 }}>
                   {lastSync ? <>Última verificación · <span style={{ fontFamily: "'JetBrains Mono', monospace", color: C.text2 }}>{lastSync.toLocaleTimeString("es-AR")}</span></> : "Sin verificar"}
                 </span>
-                <button
-                  onClick={loadHealth}
-                  disabled={healthLoading}
-                  style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.line}`, background: C.surface, color: C.text2, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                >
-                  <RefreshCw size={13} style={{ animation: healthLoading ? "spin 1s linear infinite" : "none" }} />
-                </button>
-              </>
-            }
-          />
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 18 }}>
+              </div>
+              <button
+                onClick={loadHealth}
+                disabled={healthLoading}
+                style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.line}`, background: C.surface, color: C.text2, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+              >
+                <RefreshCw size={13} style={{ animation: healthLoading ? "spin 1s linear infinite" : "none" }} />
+              </button>
+            </div>
+            <div style={{ padding: "16px 22px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
             {[
               { icon: <Server size={15} />, label: "Backend",        meta: `API online`,            footer: ["latencia", health?.backend ? "OK" : "—"],    level: backendLevel },
               { icon: <Wifi size={15} />,   label: "WebSocket",      meta: wsConnected ? "Canal en vivo conectado" : "Desconectado", footer: ["estado", wsConnected ? "activo" : "inactivo"], level: wsLevel },
@@ -469,155 +464,213 @@ export function ConfiguracionPage() {
               );
             })}
           </div>
+            </div>
+          </div>
 
 {/* ═══ DATOS GENERALES ═══ */}
-          <SectionHead id="empresa" icon={<Building2 size={12} />} title="Datos generales"
-            aux={<span>Información de la empresa en avisos y reportes</span>}
-          />
-          <Card style={{ marginBottom: 28 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px" }}>
-              <FieldRow
-                label="Nombre de la empresa" required
-                value={form.company_name ?? ""}
-                onChange={v => set("company_name", v || null)}
-                placeholder="Constructora XYZ"
-                icon={<Building2 size={14} />}
-              />
-              <FieldRow
-                label="Responsable principal" required
-                value={form.main_responsible ?? ""}
-                onChange={v => set("main_responsible", v || null)}
-                placeholder="Juan García"
-                icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M3 13.5c.6-2.3 2.6-3.8 5-3.8s4.4 1.5 5 3.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
-              />
-              <FieldRow
-                label="Email de contacto"
-                value={form.company_email ?? ""}
-                onChange={v => set("company_email", v || null)}
-                type="email"
-                placeholder="contacto@empresa.com"
-                icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.4" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M2.5 5.5L8 9l5.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
-                hint="Usado para reportes semanales y alertas críticas."
-              />
-              <FieldRow
-                label="Teléfono"
-                value={form.company_phone ?? ""}
-                onChange={v => set("company_phone", v || null)}
-                placeholder="+54 9 11 1234-5678"
-                icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 4c0-.8.6-1.5 1.4-1.5h1.4c.6 0 1.1.4 1.3 1l.4 1.5c.1.5-.1 1-.5 1.3l-.7.5c.9 1.8 2.4 3.3 4.2 4.2l.5-.7c.3-.4.8-.6 1.3-.5l1.5.4c.6.2 1 .7 1 1.3v1.4c0 .8-.7 1.4-1.5 1.4C7 13.3 2.7 9 3 4z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/></svg>}
-              />
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                  background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+                  border: "1px solid #F5D5C0",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Building2 size={15} color="#E76A2D" />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.015em", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Datos generales
+                </span>
+                <span style={{ fontSize: 12, color: C.text3, marginLeft: 4 }}>Información de la empresa en avisos y reportes</span>
+              </div>
             </div>
-          </Card>
+            <div style={{ padding: "20px 22px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px" }}>
+                <FieldRow
+                  label="Nombre de la empresa" required
+                  value={form.company_name ?? ""}
+                  onChange={v => set("company_name", v || null)}
+                  placeholder="Constructora XYZ"
+                  icon={<Building2 size={14} />}
+                />
+                <FieldRow
+                  label="Responsable principal" required
+                  value={form.main_responsible ?? ""}
+                  onChange={v => set("main_responsible", v || null)}
+                  placeholder="Juan García"
+                  icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="2.6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M3 13.5c.6-2.3 2.6-3.8 5-3.8s4.4 1.5 5 3.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                />
+                <FieldRow
+                  label="Email de contacto"
+                  value={form.company_email ?? ""}
+                  onChange={v => set("company_email", v || null)}
+                  type="email"
+                  placeholder="contacto@empresa.com"
+                  icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.4" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M2.5 5.5L8 9l5.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                  hint="Usado para reportes semanales y alertas críticas."
+                />
+                <FieldRow
+                  label="Teléfono"
+                  value={form.company_phone ?? ""}
+                  onChange={v => set("company_phone", v || null)}
+                  placeholder="+54 9 11 1234-5678"
+                  icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 4c0-.8.6-1.5 1.4-1.5h1.4c.6 0 1.1.4 1.3 1l.4 1.5c.1.5-.1 1-.5 1.3l-.7.5c.9 1.8 2.4 3.3 4.2 4.2l.5-.7c.3-.4.8-.6 1.3-.5l1.5.4c.6.2 1 .7 1 1.3v1.4c0 .8-.7 1.4-1.5 1.4C7 13.3 2.7 9 3 4z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/></svg>}
+                />
+              </div>
+            </div>
+          </div>
 
           {/* ═══ CHATBOT WHATSAPP ═══ */}
-          <SectionHead id="chatbot" icon={<MessageCircle size={12} />} title="Chatbot WhatsApp"
-            aux={<span>Procesamiento automático de mensajes entrantes</span>}
-          />
-          <Card style={{ marginBottom: 28 }}>
-            {/* WhatsApp banner */}
-            {health?.whatsapp_configured ? (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 12,
-                background: "linear-gradient(180deg, #ECF7F1, #E4F3EC)",
-                border: `1px solid ${C.goodBorder}`,
-                borderRadius: 11, padding: "12px 14px", marginBottom: 18,
-              }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: "#fff", color: C.good, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 1px ${C.goodBorder}`, flexShrink: 0 }}>
-                  <MessageCircle size={18} />
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                  background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+                  border: "1px solid #F5D5C0",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <MessageCircle size={15} color="#E76A2D" />
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: "#0E5A37", fontWeight: 500 }}>
-                    Número conectado
-                    {health.whatsapp_number && (
-                      <b style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, color: "#0E5A37", background: "#fff", padding: "1px 7px", borderRadius: 5, marginLeft: 6, boxShadow: `0 0 0 1px ${C.goodBorder}` }}>
-                        {health.whatsapp_number}
-                      </b>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: C.good, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: 99, background: C.good, flexShrink: 0, animation: "ping-green 1.8s ease-out infinite" }} />
-                    Recibiendo y enviando mensajes correctamente
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                  <button style={{ padding: "6px 11px", fontSize: 12, borderRadius: 8, background: "#fff", border: `1px solid ${C.goodBorder}`, color: "#0E5A37", cursor: "pointer" }}>Reconectar</button>
-                  <button style={{ padding: "6px 11px", fontSize: 12, borderRadius: 8, background: "#fff", border: `1px solid ${C.goodBorder}`, color: "#0E5A37", cursor: "pointer" }}>Ver registros</button>
-                </div>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.015em", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Chatbot WhatsApp
+                </span>
+                <span style={{ fontSize: 12, color: C.text3, marginLeft: 4 }}>Procesamiento automático de mensajes</span>
               </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.warn50, border: `1px solid #F0D5A0`, borderRadius: 11, padding: "12px 14px", marginBottom: 18 }}>
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" style={{ color: C.warn, flexShrink: 0 }}><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-                <span style={{ fontSize: 12.5, color: "#9A5D08", fontWeight: 500 }}>WhatsApp no configurado. Completá las variables TWILIO_* en el servidor.</span>
-              </div>
-            )}
-
-            <ToggleRow first
-              label="Chatbot habilitado"
-              description="Activa o desactiva el procesamiento de mensajes entrantes desde WhatsApp."
-              checked={form.chatbot_enabled}
-              onChange={v => set("chatbot_enabled", v)}
-              icon={<MessageCircle size={15} />}
-            />
-            <ToggleRow
-              label="Recordatorios automáticos"
-              description="Envía recordatorios proactivos a los responsables antes del vencimiento de sus tareas."
-              checked={form.auto_reminders}
-              onChange={v => set("auto_reminders", v)}
-              disabled={!form.chatbot_enabled}
-              icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
-            />
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, paddingTop: 16, marginTop: 8, borderTop: `1px solid ${C.line}` }}>
-              <SelectRow label="Horario desde" value={form.send_hour_from} onChange={v => set("send_hour_from", Number(v))}>
-                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>)}
-              </SelectRow>
-              <SelectRow label="Horario hasta" value={form.send_hour_to} onChange={v => set("send_hour_to", Number(v))}>
-                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>)}
-              </SelectRow>
-              <SelectRow label="Tiempo máx. sin respuesta" value={form.max_response_hours} onChange={v => set("max_response_hours", Number(v))}>
-                {[6, 12, 24, 48, 72].map(h => <option key={h} value={h}>{h} horas</option>)}
-              </SelectRow>
             </div>
-          </Card>
+            <div style={{ padding: "20px 22px" }}>
+              {/* WhatsApp banner */}
+              {health?.whatsapp_configured ? (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  background: "linear-gradient(180deg, #ECF7F1, #E4F3EC)",
+                  border: `1px solid ${C.goodBorder}`,
+                  borderRadius: 11, padding: "12px 14px", marginBottom: 18,
+                }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: "#fff", color: C.good, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 1px ${C.goodBorder}`, flexShrink: 0 }}>
+                    <MessageCircle size={18} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: "#0E5A37", fontWeight: 500 }}>
+                      Número conectado
+                      {health.whatsapp_number && (
+                        <b style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, color: "#0E5A37", background: "#fff", padding: "1px 7px", borderRadius: 5, marginLeft: 6, boxShadow: `0 0 0 1px ${C.goodBorder}` }}>
+                          {health.whatsapp_number}
+                        </b>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.good, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 99, background: C.good, flexShrink: 0, animation: "ping-green 1.8s ease-out infinite" }} />
+                      Recibiendo y enviando mensajes correctamente
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button style={{ padding: "6px 11px", fontSize: 12, borderRadius: 8, background: "#fff", border: `1px solid ${C.goodBorder}`, color: "#0E5A37", cursor: "pointer" }}>Reconectar</button>
+                    <button style={{ padding: "6px 11px", fontSize: 12, borderRadius: 8, background: "#fff", border: `1px solid ${C.goodBorder}`, color: "#0E5A37", cursor: "pointer" }}>Ver registros</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.warn50, border: `1px solid #F0D5A0`, borderRadius: 11, padding: "12px 14px", marginBottom: 18 }}>
+                  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" style={{ color: C.warn, flexShrink: 0 }}><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                  <span style={{ fontSize: 12.5, color: "#9A5D08", fontWeight: 500 }}>WhatsApp no configurado. Completá las variables TWILIO_* en el servidor.</span>
+                </div>
+              )}
+
+              <ToggleRow first
+                label="Chatbot habilitado"
+                description="Activa o desactiva el procesamiento de mensajes entrantes desde WhatsApp."
+                checked={form.chatbot_enabled}
+                onChange={v => set("chatbot_enabled", v)}
+                icon={<MessageCircle size={15} />}
+              />
+              <ToggleRow
+                label="Recordatorios automáticos"
+                description="Envía recordatorios proactivos a los responsables antes del vencimiento de sus tareas."
+                checked={form.auto_reminders}
+                onChange={v => set("auto_reminders", v)}
+                disabled={!form.chatbot_enabled}
+                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+              />
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, paddingTop: 16, marginTop: 8, borderTop: `1px solid ${C.line}` }}>
+                <SelectRow label="Horario desde" value={form.send_hour_from} onChange={v => set("send_hour_from", Number(v))}>
+                  {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>)}
+                </SelectRow>
+                <SelectRow label="Horario hasta" value={form.send_hour_to} onChange={v => set("send_hour_to", Number(v))}>
+                  {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>)}
+                </SelectRow>
+                <SelectRow label="Tiempo máx. sin respuesta" value={form.max_response_hours} onChange={v => set("max_response_hours", Number(v))}>
+                  {[6, 12, 24, 48, 72].map(h => <option key={h} value={h}>{h} horas</option>)}
+                </SelectRow>
+              </div>
+            </div>
+          </div>
 
           {/* ═══ AUTOMATIZACIONES + ALERTAS (2-col) ═══ */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 28 }}>
 
             {/* Automatizaciones */}
-            <div>
-              <SectionHead id="automatizaciones" icon={<Zap size={12} />} title="Automatizaciones" />
-              <Card>
-                <div>
-                  <AutoRow first label="Recordatorio 3 días antes" kbd="+3d"
-                    checked={form.reminder_3days} onChange={v => set("reminder_3days", v)}
-                    disabled={!form.auto_reminders}
-                    icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
-                  />
-                  <AutoRow label="Recordatorio 1 día antes" kbd="+1d"
-                    checked={form.reminder_1day} onChange={v => set("reminder_1day", v)}
-                    disabled={!form.auto_reminders}
-                    icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
-                  />
-                  <AutoRow label="Alertar tareas vencidas" kbd="−0d"
-                    checked={form.alert_overdue} onChange={v => set("alert_overdue", v)}
-                    icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>}
-                  />
-                  <AutoRow label="Alertar sin respuesta" kbd="24h"
-                    checked={form.alert_no_response} onChange={v => set("alert_no_response", v)}
-                    icon={<Bell size={13} />}
-                  />
-                  <AutoRow label="Reintentar envío fallido" kbd="×3"
-                    checked={form.retry_failed} onChange={v => set("retry_failed", v)}
-                    icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13 8a5 5 0 11-1.5-3.5L13 6M13 3v3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
-                  />
+            <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                    background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+                    border: "1px solid #F5D5C0",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Zap size={15} color="#E76A2D" />
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.015em", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    Automatizaciones
+                  </span>
                 </div>
-              </Card>
+              </div>
+              <div style={{ padding: "8px 22px 4px" }}>
+                <AutoRow first label="Recordatorio 3 días antes" kbd="+3d"
+                  checked={form.reminder_3days} onChange={v => set("reminder_3days", v)}
+                  disabled={!form.auto_reminders}
+                  icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                />
+                <AutoRow label="Recordatorio 1 día antes" kbd="+1d"
+                  checked={form.reminder_1day} onChange={v => set("reminder_1day", v)}
+                  disabled={!form.auto_reminders}
+                  icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+                />
+                <AutoRow label="Alertar tareas vencidas" kbd="−0d"
+                  checked={form.alert_overdue} onChange={v => set("alert_overdue", v)}
+                  icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>}
+                />
+                <AutoRow label="Alertar sin respuesta" kbd="24h"
+                  checked={form.alert_no_response} onChange={v => set("alert_no_response", v)}
+                  icon={<Bell size={13} />}
+                />
+                <AutoRow label="Reintentar envío fallido" kbd="×3"
+                  checked={form.retry_failed} onChange={v => set("retry_failed", v)}
+                  icon={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13 8a5 5 0 11-1.5-3.5L13 6M13 3v3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+                />
+              </div>
             </div>
 
             {/* Alertas */}
-            <div>
-              <SectionHead id="alertas" icon={<Bell size={12} />} title="Configuración de alertas" />
-              <Card>
+            <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                    background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+                    border: "1px solid #F5D5C0",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Bell size={15} color="#E76A2D" />
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.015em", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    Configuración de alertas
+                  </span>
+                </div>
+              </div>
+              <div style={{ padding: "8px 22px 4px" }}>
                 <ToggleRow first
                   label="Tarea vencida"
                   description="Mostrar alerta cuando una tarea pasa su fecha límite."
@@ -646,15 +699,29 @@ export function ConfiguracionPage() {
                   icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3.5" width="11" height="10" rx="1.4" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M5.5 2v3M10.5 2v3M2.5 7h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
                   iconStyle={{ background: C.secondary50, color: C.secondary }}
                 />
-              </Card>
+              </div>
             </div>
           </div>
 
           {/* ═══ TIEMPO REAL ═══ */}
-          <SectionHead id="tiempo-real" icon={<Wifi size={12} />} title="Tiempo real"
-            aux={<span>Sincronización en vivo con el chatbot y el backend</span>}
-          />
-          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "6px 22px", marginBottom: 28 }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                  background: "linear-gradient(135deg, #FFF0E8 0%, #FFE0CC 100%)",
+                  border: "1px solid #F5D5C0",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Wifi size={15} color="#E76A2D" />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.015em", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Tiempo real
+                </span>
+                <span style={{ fontSize: 12, color: C.text3, marginLeft: 4 }}>Sincronización en vivo</span>
+              </div>
+            </div>
+            <div style={{ padding: "0 22px" }}>
             {[
               {
                 icon: <Wifi size={16} />, iconStyle: { background: C.info50, color: C.info },
@@ -700,12 +767,10 @@ export function ConfiguracionPage() {
                 {lastSync ? lastSync.toLocaleTimeString("es-AR") : "—"}
               </span>
             </div>
+            </div>
           </div>
 
           {/* ═══ HERRAMIENTAS DE TESTING ═══ */}
-          <SectionHead id="herramientas" icon={<Shield size={12} />} title="Herramientas"
-            aux={<span>Acciones de testing y diagnóstico</span>}
-          />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
 
             {/* Test WhatsApp */}
@@ -759,7 +824,7 @@ export function ConfiguracionPage() {
           </div>
 
           {/* ═══ SAVE BAR ═══ */}
-          {dirty && (
+          {dirty && canEdit && (
             <div style={{
               position: "sticky", bottom: 18, zIndex: 4, marginTop: 24,
               background: C.primary, color: "#fff", borderRadius: 14,

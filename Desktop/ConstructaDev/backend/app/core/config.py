@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     TWILIO_WHATSAPP_NUMBER: str = ""  # e.g. "whatsapp:+14155238886"
     # Full public URL of this server (needed for Twilio signature validation behind ngrok)
     PUBLIC_BASE_URL: str = ""  # e.g. "https://abc123.ngrok.io"
+    # URL of the frontend app — used to build invite links
+    FRONTEND_URL: str = "http://localhost:5173"
 
     # Phase 3 — AI (not active yet)
     ANTHROPIC_API_KEY: str = ""

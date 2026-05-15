@@ -12,13 +12,14 @@ class ObraService:
         self.repo = ObraRepository(session)
         self.historial = HistorialRepository(session)
 
-    async def create(self, data: ObraCreate, manager_id: int) -> Obra:
+    async def create(self, data: ObraCreate, manager_id: int, actor: dict | None = None) -> Obra:
         obra = Obra(**data.model_dump(), manager_id=manager_id)
         obra = await self.repo.create(obra)
         await self.historial.log(
             obra_id=obra.id,
             event_type="obra_created",
             description=f"Obra '{obra.name}' created",
+            payload={"actor": actor} if actor else None,
             triggered_by="user",
         )
         return obra
@@ -38,7 +39,10 @@ class ObraService:
     async def list_mine(self, manager_id: int) -> list[Obra]:
         return await self.repo.list_by_manager(manager_id)
 
-    async def update(self, obra_id: int, data: ObraUpdate, manager_id: int) -> Obra:
+    async def list_all(self) -> list[Obra]:
+        return await self.repo.list_all()
+
+    async def update(self, obra_id: int, data: ObraUpdate, manager_id: int, actor: dict | None = None) -> Obra:
         obra = await self.get_for_manager(obra_id, manager_id)
 
         # Two dumps: SQLAlchemy needs native Python types (e.g. date objects),
@@ -51,6 +55,8 @@ class ObraService:
             return obra
 
         updated = await self.repo.update_fields(obra_id, **changes)
+        if actor is not None:
+            changes_json["actor"] = actor
         await self.historial.log(
             obra_id=obra_id,
             event_type="obra_updated",

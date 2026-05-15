@@ -1,13 +1,11 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import {
-  AlertTriangle, ChevronRight, GripVertical, Pencil,
+  AlertTriangle,
   ArrowRight, Calendar, Activity,
 } from "lucide-react";
 import { GanttTimeline } from "./GanttTimeline";
 import { HistorialPanel } from "./HistorialPanel";
-import { SectionTitle } from "./ui/SectionTitle";
-import { StatusBadge } from "./ui/StatusBadge";
 import type { Alert, HistorialEvento, Responsible, Task } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -266,36 +264,15 @@ export function ResumenTab({
 
       {/* ── Gantt timeline ────────────────────────────────────────────────────── */}
       <section>
-        <SectionTitle
-          aside={
-            <div className="flex items-center gap-3">
-              {tasksWithoutDates.length > 0 && (
-                <span className="flex items-center gap-1 text-xs font-semibold text-constructa-warning">
-                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                  {tasksWithoutDates.length} sin fechas
-                </span>
-              )}
-              <span className="text-xs text-constructa-secondaryText">
-                {tasks.filter((t) => t.start_date || t.due_date).length} con fechas
-              </span>
-            </div>
-          }
-        >
-          <span className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-constructa-secondaryText" />
-            Cronograma de tareas
-          </span>
-        </SectionTitle>
-        <div className="bg-white border border-constructa-border rounded-xl shadow-card p-4">
-          <GanttTimeline
-            tasks={tasks}
-            responsibles={responsibles}
-            obraStartDate={obraStartDate}
-            obraExpectedEndDate={obraExpectedEndDate}
-            onSaved={onTaskRescheduled}
-            onEditTask={onEditTask}
-          />
-        </div>
+        <GanttTimeline
+          tasks={tasks}
+          responsibles={responsibles}
+          obraStartDate={obraStartDate}
+          obraExpectedEndDate={obraExpectedEndDate}
+          onSaved={onTaskRescheduled}
+          onEditTask={onEditTask}
+          tasksWithoutDates={tasksWithoutDates.length}
+        />
       </section>
 
       {/* ── Lower two-column section ──────────────────────────────────────────── */}
@@ -303,36 +280,83 @@ export function ResumenTab({
 
         {/* Tareas sin fechas */}
         <section className="flex flex-col">
-          <SectionTitle
-            aside={
-              tasksWithoutDates.length > 0 ? (
-                <span className="text-[10px] text-constructa-secondaryText bg-constructa-surface rounded px-2 py-1">
-                  Arrastrá al cronograma para programar
+          <div style={{
+            background: "#fff",
+            border: "1px solid #E6E7E5",
+            borderRadius: 14,
+            overflow: "hidden",
+            flex: 1,
+          }}>
+            {/* Header */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "14px 20px",
+              borderBottom: tasksWithoutDates.length > 0 ? "1px solid #F0F1EF" : "none",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                  background: tasksWithoutDates.length > 0 ? "#FDF1DE" : "#E4F3EC",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {tasksWithoutDates.length > 0
+                    ? <AlertTriangle style={{ width: 15, height: 15, color: "#C97D0E" }} />
+                    : <Calendar style={{ width: 15, height: 15, color: "#1F8A5B" }} />
+                  }
+                </div>
+                <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, fontWeight: 700, color: "#1A2329", letterSpacing: "-0.01em" }}>
+                  Tareas sin fechas
                 </span>
-              ) : undefined
-            }
-          >
-            <span className="flex items-center gap-2">
-              {tasksWithoutDates.length > 0 && (
-                <AlertTriangle className="w-4 h-4 text-constructa-warning" />
-              )}
-              Tareas sin fechas
-              {tasksWithoutDates.length > 0 && (
-                <span className="ml-1 text-xs font-normal text-constructa-secondaryText">
-                  ({tasksWithoutDates.length})
+                <span style={{
+                  fontSize: 11.5, fontWeight: 600,
+                  padding: "2px 9px", borderRadius: 99,
+                  background: tasksWithoutDates.length > 0 ? "#FDF1DE" : "#F0F1EF",
+                  color: tasksWithoutDates.length > 0 ? "#9A5D08" : "#5B6770",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>
+                  {tasksWithoutDates.length}
                 </span>
+              </div>
+              {tasksWithoutDates.length > 5 && (
+                <button
+                  onClick={onViewTareas}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 13, fontWeight: 600, color: "#FF6B35",
+                    background: "none", border: "none", cursor: "pointer", padding: 0,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "#E85A26")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "#FF6B35")}
+                >
+                  Ver todas
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
               )}
-            </span>
-          </SectionTitle>
-          <div className="bg-white border border-constructa-border rounded-xl shadow-card overflow-hidden flex-1">
+            </div>
+
+            {/* Rows */}
             {tasksWithoutDates.length === 0 ? (
-              <div className="py-5 text-center text-constructa-secondaryText text-sm">
+              <div style={{ padding: "32px 20px", textAlign: "center", color: "#8E97A0", fontSize: 13 }}>
                 Todas las tareas tienen fechas definidas.
               </div>
             ) : (
-              <>
-                <ul className="divide-y divide-constructa-surface">
-                  {tasksWithoutDates.slice(0, 5).map((t) => (
+              <ol style={{ margin: 0, padding: "0 20px", listStyle: "none" }}>
+                {tasksWithoutDates.slice(0, 5).map((t, i) => {
+                  const STATUS_STYLE: Record<string, { label: string; dot: string; color: string; bg: string; border: string; avatarBg: string }> = {
+                    pendiente:   { label: "Pendiente",   dot: "#E89B14", color: "#9A5D08", bg: "#FDF1DE", border: "#F0D5A0", avatarBg: "#E89B14" },
+                    en_progreso: { label: "En progreso", dot: "#E85A26", color: "#C74018", bg: "#FFF1E9", border: "#FDBFA0", avatarBg: "#E85A26" },
+                    bloqueada:   { label: "Bloqueada",   dot: "#D03A3A", color: "#A82B2B", bg: "#FCE5E5", border: "#F0B0B0", avatarBg: "#D03A3A" },
+                    en_revision: { label: "En revisión", dot: "#2A6FDB", color: "#1A4FA8", bg: "#E5EEFB", border: "#B3CEFA", avatarBg: "#2A6FDB" },
+                    completada:  { label: "Completada",  dot: "#1F8A5B", color: "#136E47", bg: "#E4F3EC", border: "#BFE3CE", avatarBg: "#1F8A5B" },
+                    cancelada:   { label: "Cancelada",   dot: "#8E97A0", color: "#5B6770", bg: "#F0F1EF", border: "#E0E3E1", avatarBg: "#8E97A0" },
+                  };
+                  const s = STATUS_STYLE[t.status] ?? STATUS_STYLE.pendiente;
+                  const initials = t.title.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
+                  const resp = responsibles.find(r => r.id === t.responsible_id);
+
+                  return (
                     <li
                       key={t.id}
                       draggable
@@ -342,76 +366,136 @@ export function ResumenTab({
                         e.dataTransfer.effectAllowed = "copy";
                       }}
                       onDragEnd={() => setDraggingId(null)}
-                      className={[
-                        "flex items-center gap-3 px-4 py-2.5 transition-opacity hover:bg-constructa-bg",
-                        draggingId === t.id ? "opacity-40" : "cursor-grab",
-                      ].join(" ")}
+                      style={{
+                        display: "flex", alignItems: "flex-start", gap: 14,
+                        padding: "16px 0",
+                        borderTop: i > 0 ? "1px solid #F0F1EF" : "none",
+                        opacity: draggingId === t.id ? 0.4 : 1,
+                        cursor: "grab",
+                        transition: "opacity 0.15s",
+                      }}
                     >
-                      <GripVertical className="w-3.5 h-3.5 text-constructa-border flex-shrink-0" />
-                      <span
-                        className="flex-1 min-w-0 text-sm font-semibold text-constructa-text truncate"
-                        title={t.title}
-                      >
-                        {t.title}
-                      </span>
-                      <StatusBadge status={t.status} />
+                      {/* Avatar */}
+                      <div style={{
+                        width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+                        background: s.avatarBg,
+                        color: "#fff",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        fontWeight: 700, fontSize: 13,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        letterSpacing: "0.02em",
+                      }}>
+                        {initials || "#"}
+                      </div>
+
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p
+                          style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1A2329", lineHeight: 1.45, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                          title={t.title}
+                        >
+                          {t.title}
+                        </p>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", gap: 5,
+                            padding: "2px 9px 2px 7px", borderRadius: 99,
+                            border: `1px solid ${s.border}`, background: s.bg,
+                            fontSize: 11.5, fontWeight: 600, color: s.color, whiteSpace: "nowrap",
+                          }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 99, background: s.dot, flexShrink: 0 }} />
+                            {s.label}
+                          </span>
+                          <span style={{ fontSize: 12, color: "#8E97A0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {resp ? resp.full_name : "Sin responsable"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action */}
                       <button
-                        onClick={() => onEditTask(t)}
+                        onClick={(e) => { e.stopPropagation(); onEditTask(t); }}
                         title="Agregar fechas"
-                        className="flex items-center gap-1 flex-shrink-0 px-2 py-1 rounded text-xs font-semibold text-constructa-secondaryText hover:text-constructa-primary hover:bg-constructa-surface transition-colors"
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          padding: "5px 11px", borderRadius: 8,
+                          fontSize: 12, fontWeight: 600,
+                          color: "#5B6770", background: "#F4F5F4",
+                          border: "1px solid #E6E7E5", cursor: "pointer",
+                          flexShrink: 0, transition: "background 0.12s, color 0.12s",
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#FFF1E9"; (e.currentTarget as HTMLElement).style.color = "#FF6B35"; (e.currentTarget as HTMLElement).style.borderColor = "#FDBFA0"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#F4F5F4"; (e.currentTarget as HTMLElement).style.color = "#5B6770"; (e.currentTarget as HTMLElement).style.borderColor = "#E6E7E5"; }}
                       >
-                        <Pencil className="w-3 h-3" />
-                        Agregar fechas
+                        <Calendar style={{ width: 12, height: 12 }} />
+                        Programar
                       </button>
                     </li>
-                  ))}
-                </ul>
-                {tasksWithoutDates.length > 5 && (
-                  <div className="px-4 py-2.5 border-t border-constructa-surface bg-constructa-bg flex items-center justify-between">
-                    <p className="text-xs text-constructa-secondaryText">
-                      Mostrando 5 de {tasksWithoutDates.length} tareas sin fechas
-                    </p>
-                    <button
-                      onClick={onViewTareas}
-                      className="flex items-center gap-0.5 text-xs font-semibold text-constructa-primary hover:text-constructa-primary/80 transition-colors"
-                    >
-                      Ver todas
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-              </>
+                  );
+                })}
+              </ol>
             )}
           </div>
         </section>
 
         {/* Actividad reciente */}
         <section className="flex flex-col">
-          <SectionTitle
-            aside={
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-constructa-secondaryText">
+          <div style={{
+            background: "#fff",
+            border: "1px solid #E6E7E5",
+            borderRadius: 14,
+            overflow: "hidden",
+            flex: 1,
+          }}>
+            {/* Header */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "14px 20px",
+              borderBottom: historial.length > 0 ? "1px solid #F0F1EF" : "none",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                  background: "#FFF1E9",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Activity style={{ width: 15, height: 15, color: "#FF6B35" }} />
+                </div>
+                <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, fontWeight: 700, color: "#1A2329", letterSpacing: "-0.01em" }}>
+                  Actividad reciente
+                </span>
+                <span style={{
+                  fontSize: 11.5, fontWeight: 600,
+                  padding: "2px 9px", borderRadius: 99,
+                  background: "#F0F1EF", color: "#5B6770",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>
                   {historial.length} eventos
                 </span>
-                {onViewHistorial && (
-                  <button
-                    onClick={onViewHistorial}
-                    className="flex items-center gap-0.5 text-xs font-semibold text-constructa-primary hover:text-constructa-primary/80 transition-colors"
-                  >
-                    Ver todo
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
               </div>
-            }
-          >
-            <span className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-constructa-secondaryText" />
-              Actividad reciente
-            </span>
-          </SectionTitle>
-          <div className="bg-white border border-constructa-border rounded-xl shadow-card p-4 flex-1">
-            <HistorialPanel events={historial.slice(0, 3)} tasks={tasks} />
+              {onViewHistorial && (
+                <button
+                  onClick={onViewHistorial}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 13, fontWeight: 600, color: "#FF6B35",
+                    background: "none", border: "none", cursor: "pointer", padding: 0,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "#E85A26")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "#FF6B35")}
+                >
+                  Ver todo
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Feed */}
+            <div style={{ padding: "0 20px" }}>
+              <HistorialPanel events={historial.slice(0, 5)} tasks={tasks} />
+            </div>
           </div>
         </section>
       </div>

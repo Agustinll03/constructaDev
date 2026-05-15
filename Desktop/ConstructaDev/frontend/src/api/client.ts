@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearToken, getToken } from "../lib/tokenStorage";
 
 const BASE_URL = "http://localhost:8000/api/v1";
 
@@ -7,9 +8,9 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
+  const token = getToken();
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers.set("Authorization", `Bearer ${token}`);
   }
   return config;
 });
@@ -17,8 +18,13 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem("access_token");
+    const status = err.response?.status;
+    const detail = err.response?.data?.detail;
+    const isUnauthenticated =
+      status === 401 ||
+      (status === 403 && detail === "Not authenticated");
+    if (isUnauthenticated) {
+      clearToken();
       window.location.href = "/";
     }
     return Promise.reject(err);
