@@ -6,6 +6,7 @@ from app.core.exceptions import ConflictError
 from app.repositories.user import UserRepository
 from app.schemas.user import InviteRequest, InviteResponse, UserRead
 from app.services.auth_service import AuthService
+from app.services.email_service import send_invite_email
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -27,6 +28,7 @@ async def invite_member(data: InviteRequest, current_user: AdminUser, db: DbSess
     except ConflictError as e:
         raise HTTPException(status_code=409, detail=str(e))
     invite_url = f"{settings.FRONTEND_URL}/invite/{token}"
+    await send_invite_email(data.email, invite_url, data.role)
     return InviteResponse(invite_token=token, invite_url=invite_url)
 
 
