@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import socket from "../lib/socket";
+import type { TaskCreatedPayload, TaskUpdatedPayload, TaskDeletedPayload } from "./useTaskSocket";
 
 export interface ActivityEvent {
   id: string;
@@ -12,67 +14,77 @@ export interface ActivityEvent {
   timestamp: Date;
 }
 
-const USERS = [
-  { id: 2, name: "Carlos López",  initials: "CL", color: "#2A6FDB" },
-  { id: 3, name: "María Torres",  initials: "MT", color: "#1F8A5B" },
-  { id: 4, name: "Roberto Díaz",  initials: "RD", color: "#8E97A0" },
-];
+const AVATAR_COLORS = ["#FF6B35", "#2A6FDB", "#1F8A5B", "#9A4DC9", "#C97D0E", "#D03A3A", "#2C6571"];
 
-const EVENT_TEMPLATES = [
-  { action: "movió",          target: "Instalación eléctrica",  detail: "a En progreso" },
-  { action: "actualizó",      target: "Cimientos",              detail: "al 75% de avance" },
-  { action: "completó",       target: "Instalación sanitaria" },
-  { action: "creó la tarea",  target: "Revisión estructural" },
-  { action: "movió",          target: "Pintura exterior",        detail: "a Revisión" },
-  { action: "actualizó",      target: "Mampostería",             detail: "al 40% de avance" },
-  { action: "bloqueó",        target: "Techos",                  detail: "por falta de materiales" },
-  { action: "completó",       target: "Excavación perimetral" },
-  { action: "creó la tarea",  target: "Impermeabilización" },
-  { action: "movió",          target: "Carpintería",             detail: "a Pendiente" },
-];
+function avatarColor(userId: number): string {
+  return AVATAR_COLORS[userId % AVATAR_COLORS.length];
+}
 
-function randomEvent(): ActivityEvent {
-  const user = USERS[Math.floor(Math.random() * USERS.length)];
-  const tpl  = EVENT_TEMPLATES[Math.floor(Math.random() * EVENT_TEMPLATES.length)];
+function getInitials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
+}
+
+function makeEvent(userId: number, userName: string, action: string, target: string, detail?: string): ActivityEvent {
   return {
-    id:           `evt-${Date.now()}-${Math.random()}`,
-    userId:       user.id,
-    userName:     user.name,
-    userInitials: user.initials,
-    userColor:    user.color,
-    action:       tpl.action,
-    target:       tpl.target,
-    detail:       tpl.detail,
-    timestamp:    new Date(),
+    id: `evt-${Date.now()}-${Math.random()}`,
+    userId,
+    userName,
+    userInitials: getInitials(userName),
+    userColor: avatarColor(userId),
+    action,
+    target,
+    detail,
+    timestamp: new Date(),
   };
 }
 
-// Returns [events, latestEvent] — latestEvent triggers toasts
-export function useActivityFeed(): [ActivityEvent[], ActivityEvent | null] {
-  const [events, setEvents]   = useState<ActivityEvent[]>(() =>
-    // Seed with 4 past events spaced out
-    Array.from({ length: 4 }, (_, i) => {
-      const e = randomEvent();
-      e.timestamp = new Date(Date.now() - (i + 1) * 4 * 60 * 1000);
-      return e;
-    }).reverse()
-  );
-  const [latest, setLatest]   = useState<ActivityEvent | null>(null);
-  const timerRef              = useRef<ReturnType<typeof setTimeout>>();
+/**
+ * Subscribes to real socket events (task_created, task_updated, task_deleted)
+ * and converts them to ActivityEvent notifications.
+ *
+ * Events from the current user are filtered out so you don't see your own actions.
+ */
+export function useActivityFeed(currentUserId?: number): [ActivityEvent[], ActivityEvent | null] {
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [latest, setLatest] = useState<ActivityEvent | null>(null);
+  const currentUserIdRef = useRef(currentUserId);
+  currentUserIdRef.current = currentUserId;
 
   useEffect(() => {
-    function scheduleNext() {
-      // Random interval between 20s and 40s
-      const delay = 20000 + Math.random() * 20000;
-      timerRef.current = setTimeout(() => {
-        const evt = randomEvent();
-        setEvents(prev => [...prev.slice(-19), evt]); // keep last 20
-        setLatest(evt);
-        scheduleNext();
-      }, delay);
+    if (!socket.connected) socket.connect();
+
+    function push(evt: ActivityEvent) {
+      setEvents(prev => [...prev.slice(-19), evt]);
+      setLatest(evt);
     }
-    scheduleNext();
-    return () => clearTimeout(timerRef.current);
+
+    function handleCreated(p: TaskCreatedPayload) {
+      if (!p.actor) return;
+      if (currentUserIdRef.current && p.actor.id === currentUserIdRef.current) return;
+      push(makeEvent(p.actor.id, p.actor.name, "creó la tarea", p.title));
+    }
+
+    function handleUpdated(p: TaskUpdatedPayload) {
+      if (!p.actor) return;
+      if (currentUserIdRef.current && p.actor.id === currentUserIdRef.current) return;
+      push(makeEvent(p.actor.id, p.actor.name, "actualizó", p.title));
+    }
+
+    function handleDeleted(p: TaskDeletedPayload) {
+      if (!p.actor) return;
+      if (currentUserIdRef.current && p.actor.id === currentUserIdRef.current) return;
+      push(makeEvent(p.actor.id, p.actor.name, "eliminó la tarea", p.title));
+    }
+
+    socket.on("task_created", handleCreated);
+    socket.on("task_updated", handleUpdated);
+    socket.on("task_deleted", handleDeleted);
+
+    return () => {
+      socket.off("task_created", handleCreated);
+      socket.off("task_updated", handleUpdated);
+      socket.off("task_deleted", handleDeleted);
+    };
   }, []);
 
   return [events, latest];

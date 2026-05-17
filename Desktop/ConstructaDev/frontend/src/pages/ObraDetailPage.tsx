@@ -15,6 +15,7 @@ import { ObraResponsablesTab } from "../components/ObraResponsablesTab";
 import { useTaskSocket } from "../hooks/useTaskSocket";
 import { useCan } from "../hooks/usePermission";
 import { useEditingSimulation } from "../hooks/useEditingSimulation";
+import { useViewingUsers } from "../hooks/useOnlineUsers";
 import type { Alert, HistorialEvento, Obra, ObraStatus, ObraTab, Responsible, Task } from "../types";
 
 // ── Visual helpers ─────────────────────────────────────────────────────────────
@@ -56,6 +57,7 @@ interface ObraDetailPageProps {
 
 export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraDetailPageProps) {
   const can = useCan();
+  const viewingUsers = useViewingUsers(obra.id);
   const [tasks, setTasks] = useState<Task[]>([]);
   const editingMap   = useEditingSimulation(obra.id);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -120,18 +122,36 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
 
   useEffect(() => { refreshTasks(); }, [activeTab, refreshTasks]);
 
-  useTaskSocket(
-    obra.id,
-    useCallback((payload) => {
+  useTaskSocket({
+    obraId: obra.id,
+    onTaskUpdated: useCallback((payload) => {
       setTasks((prev) =>
         prev.map((t) =>
           t.id === payload.taskId
-            ? { ...t, status: payload.status, estimated_progress: payload.estimatedProgress, due_date: payload.dueDate, updated_at: payload.updatedAt }
+            ? { ...t, title: payload.title, status: payload.status, estimated_progress: payload.estimatedProgress, responsible_id: payload.responsibleId, start_date: payload.startDate, due_date: payload.dueDate, updated_at: payload.updatedAt }
             : t
         )
       );
-    }, [])
-  );
+    }, []),
+    onTaskCreated: useCallback((payload) => {
+      setTasks((prev) => {
+        if (prev.some((t) => t.id === payload.taskId)) return prev;
+        const newTask = {
+          id: payload.taskId, obra_id: payload.obraId, title: payload.title,
+          description: payload.description, status: payload.status,
+          estimated_progress: payload.estimatedProgress, responsible_id: payload.responsibleId,
+          start_date: payload.startDate, due_date: payload.dueDate,
+          start_time: payload.startTime, due_time: payload.dueTime,
+          order_index: payload.orderIndex, depends_on_id: null, completed_date: null,
+          created_at: payload.createdAt, updated_at: payload.updatedAt,
+        };
+        return [...prev, newTask];
+      });
+    }, []),
+    onTaskDeleted: useCallback((payload) => {
+      setTasks((prev) => prev.filter((t) => t.id !== payload.taskId));
+    }, []),
+  });
 
   async function handleMarkRead(alertId: number) {
     try {
@@ -515,7 +535,72 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
           </div>
 
           {/* Right: avatars + actions */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, position: "relative" }}>
+
+            {/* Viewing users — other users in this obra */}
+            {viewingUsers.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {/* Avatar stack */}
+                <div style={{ display: "flex" }}>
+                  {viewingUsers.slice(0, 3).map((u, i) => (
+                    <div
+                      key={u.id}
+                      title={u.name}
+                      style={{
+                        width: 28, height: 28, borderRadius: 99, flexShrink: 0,
+                        background: u.color, color: "#fff",
+                        fontSize: 10, fontWeight: 700,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        border: "2.5px solid #fff",
+                        marginLeft: i > 0 ? -8 : 0,
+                        zIndex: 3 - i, position: "relative",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+                      }}
+                    >
+                      {u.initials}
+                    </div>
+                  ))}
+                  {viewingUsers.length > 3 && (
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 99,
+                      background: "#F0F1EF", color: "#5B6770",
+                      fontSize: 10, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2.5px solid #fff",
+                      marginLeft: -8, position: "relative",
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}>
+                      +{viewingUsers.length - 3}
+                    </div>
+                  )}
+                </div>
+
+                {/* Label */}
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{
+                    width: 6, height: 6, borderRadius: 99,
+                    background: "#1F8A5B", flexShrink: 0,
+                    boxShadow: "0 0 0 3px rgba(31,138,91,0.20)",
+                    animation: "pulse-green 2s ease-in-out infinite",
+                  }} />
+                  <span style={{
+                    fontSize: 12, color: "#5B6770",
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {viewingUsers.length === 1
+                      ? `${viewingUsers[0].name.split(" ")[0]} también está aquí`
+                      : `${viewingUsers.length} personas aquí`
+                    }
+                  </span>
+                </div>
+
+                {/* Divider */}
+                <div style={{ width: 1, height: 20, background: "#E6E7E5", flexShrink: 0 }} />
+              </div>
+            )}
+
             {/* Nueva tarea — solo en resumen */}
             {activeTab === "resumen" && can("tarea.create") && (
               <button

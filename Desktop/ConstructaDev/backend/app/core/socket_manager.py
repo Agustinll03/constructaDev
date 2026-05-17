@@ -107,7 +107,7 @@ async def connect(sid: str, environ: dict, auth: dict | None) -> None:
     await sio.save_session(sid, {"user_id": user_id})
     _sessions[sid] = _user_card(user_id, user.full_name)
     await _broadcast_online()
-    logger.debug("connect sid=%s user_id=%d", sid, user_id)
+    logger.info("connect sid=%s user_id=%d name=%s sessions=%d", sid, user_id, user.full_name, len(_sessions))
 
 
 @sio.event
@@ -125,17 +125,27 @@ async def disconnect(sid: str) -> None:
     await _broadcast_online()
     for oid in affected:
         await _broadcast_presence(oid)
-    logger.debug("disconnect sid=%s", sid)
+    logger.info("disconnect sid=%s sessions=%d", sid, len(_sessions))
 
 
 # ── Presence events ────────────────────────────────────────────────────────────
 
 @sio.event
+async def request_online_users(sid: str) -> None:
+    users = _dedup(list(_sessions.values()))
+    await sio.emit("online_users", {"users": users}, room=sid)
+    logger.debug("request_online_users sid=%s → %d users", sid, len(users))
+
+
+@sio.event
 async def join_obra(sid: str, data: dict) -> None:
     obra_id = data.get("obra_id")
     if not isinstance(obra_id, int):
+        obra_id_raw = data.get("obra_id")
+        logger.warning("join_obra got non-int obra_id=%r type=%s sid=%s", obra_id_raw, type(obra_id_raw).__name__, sid)
         return
     _viewers.setdefault(obra_id, set()).add(sid)
+    logger.info("join_obra obra_id=%d sid=%s viewers=%d", obra_id, sid, len(_viewers[obra_id]))
     await _broadcast_presence(obra_id)
 
 
@@ -169,17 +179,53 @@ async def stop_editing_task(sid: str, data: dict) -> None:
     await _broadcast_presence(obra_id)
 
 
-# ── Task update (called from chatbot service) ──────────────────────────────────
+# ── Task events (called from task_service & chatbot service) ─────────────────
 
-async def emit_task_updated(task) -> None:
+async def emit_task_created(task, actor: dict | None = None) -> None:
     payload = {
         "taskId": task.id,
         "obraId": task.obra_id,
-        "responsableId": task.responsible_id,
+        "title": task.title,
+        "description": task.description,
         "status": task.status.value,
         "estimatedProgress": task.estimated_progress,
+        "responsibleId": task.responsible_id,
+        "startDate": str(task.start_date) if task.start_date else None,
+        "dueDate": str(task.due_date) if task.due_date else None,
+        "startTime": str(task.start_time) if task.start_time else None,
+        "dueTime": str(task.due_time) if task.due_time else None,
+        "orderIndex": task.order_index,
+        "createdAt": task.created_at.isoformat(),
+        "updatedAt": task.updated_at.isoformat(),
+        "actor": actor,
+    }
+    await sio.emit("task_created", payload, room=f"obra_{task.obra_id}")
+    logger.debug("task_created taskId=%d obraId=%d", task.id, task.obra_id)
+
+
+async def emit_task_updated(task, actor: dict | None = None) -> None:
+    payload = {
+        "taskId": task.id,
+        "obraId": task.obra_id,
+        "title": task.title,
+        "responsibleId": task.responsible_id,
+        "status": task.status.value,
+        "estimatedProgress": task.estimated_progress,
+        "startDate": str(task.start_date) if task.start_date else None,
         "dueDate": str(task.due_date) if task.due_date else None,
         "updatedAt": task.updated_at.isoformat(),
+        "actor": actor,
     }
     await sio.emit("task_updated", payload, room=f"obra_{task.obra_id}")
     logger.debug("task_updated taskId=%d obraId=%d", task.id, task.obra_id)
+
+
+async def emit_task_deleted(task_id: int, obra_id: int, title: str, actor: dict | None = None) -> None:
+    payload = {
+        "taskId": task_id,
+        "obraId": obra_id,
+        "title": title,
+        "actor": actor,
+    }
+    await sio.emit("task_deleted", payload, room=f"obra_{obra_id}")
+    logger.debug("task_deleted taskId=%d obraId=%d", task_id, obra_id)

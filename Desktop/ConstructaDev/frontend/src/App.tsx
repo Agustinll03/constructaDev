@@ -22,7 +22,7 @@ function getInviteToken(): string | null {
 
 function App() {
   const { user, loading: userLoading, refetch: refetchUser } = useUser();
-  const [, latestActivity]              = useActivityFeed();
+  const [, latestActivity]              = useActivityFeed(user?.id);
   const [authed, setAuthed]             = useState(() => !!getToken());
   const [activePage, setActivePage]     = useState<Page>("panel");
   const [selectedObra, setSelectedObra] = useState<Obra | null>(null);

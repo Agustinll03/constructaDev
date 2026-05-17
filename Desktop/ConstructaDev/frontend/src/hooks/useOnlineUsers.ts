@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import socket from "../lib/socket";
 import { useUser } from "../context/UserContext";
 
@@ -23,17 +23,32 @@ interface PresencePayload {
 export function useOnlineUsers(): OnlineUser[] {
   const { user } = useUser();
   const [online, setOnline] = useState<OnlineUser[]>([]);
+  const userIdRef = useRef(user.id);
+  userIdRef.current = user.id;
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
 
     function handler({ users }: OnlineUsersPayload) {
-      setOnline(users.filter(u => u.id !== user.id));
+      setOnline(users.filter(u => u.id !== userIdRef.current));
+    }
+
+    function onConnect() {
+      socket.emit("request_online_users");
     }
 
     socket.on("online_users", handler);
-    return () => { socket.off("online_users", handler); };
-  }, [user.id]);
+    socket.on("connect", onConnect);
+
+    // If already connected, request immediately (might have missed the initial broadcast)
+    if (socket.connected) socket.emit("request_online_users");
+
+    return () => {
+      socket.off("online_users", handler);
+      socket.off("connect", onConnect);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return online;
 }
@@ -42,24 +57,35 @@ export function useOnlineUsers(): OnlineUser[] {
 export function useViewingUsers(obraId: number): OnlineUser[] {
   const { user } = useUser();
   const [viewers, setViewers] = useState<OnlineUser[]>([]);
+  const obraIdRef = useRef(obraId);
+  const userIdRef = useRef(user.id);
+  obraIdRef.current = obraId;
+  userIdRef.current = user.id;
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
 
-    socket.emit("join_obra", { obra_id: obraId });
-
-    function handler({ obra_id, viewers: v }: PresencePayload) {
-      if (obra_id !== obraId) return;
-      setViewers(v.filter(u => u.id !== user.id));
+    function emitJoin() {
+      socket.emit("join_obra", { obra_id: obraIdRef.current });
     }
 
-    socket.on("presence_update", handler);
+    function handlePresence({ obra_id, viewers: v }: PresencePayload) {
+      if (obra_id !== obraIdRef.current) return;
+      setViewers(v.filter(u => u.id !== userIdRef.current));
+    }
+
+    emitJoin();
+    socket.on("presence_update", handlePresence);
+    socket.on("connect", emitJoin);
 
     return () => {
-      socket.emit("leave_obra", { obra_id: obraId });
-      socket.off("presence_update", handler);
+      socket.emit("leave_obra", { obra_id: obraIdRef.current });
+      socket.off("presence_update", handlePresence);
+      socket.off("connect", emitJoin);
+      setViewers([]);
     };
-  }, [obraId, user.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [obraId]);
 
   return viewers;
 }

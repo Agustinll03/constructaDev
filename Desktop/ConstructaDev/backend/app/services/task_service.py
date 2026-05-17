@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, NotFoundError, UnprocessableError
+from app.core.socket_manager import emit_task_created, emit_task_deleted, emit_task_updated
 from app.models.alert import AlertType
 from app.models.task import Task, TaskStatus
 from app.repositories.alert import AlertRepository
@@ -138,6 +139,7 @@ class TaskService:
             payload={"actor": actor} if actor else None,
             triggered_by="user",
         )
+        await emit_task_created(task, actor)
         return task
 
     async def get_or_raise(self, task_id: int) -> Task:
@@ -230,6 +232,7 @@ class TaskService:
             )
 
         await self._resolve_update_alerts(task_id, changes)
+        await emit_task_updated(updated, actor)
         return updated  # type: ignore[return-value]
 
     async def delete(self, task_id: int, manager_id: int, actor: dict | None = None) -> None:
@@ -272,6 +275,7 @@ class TaskService:
         )
 
         await self.repo.delete(task_id)
+        await emit_task_deleted(task_id, obra_id, title, actor)
 
     async def apply_status_update(self, task_id: int, update: TaskStatusUpdate) -> Task:
         """

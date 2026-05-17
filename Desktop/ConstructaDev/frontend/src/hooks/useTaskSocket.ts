@@ -1,46 +1,120 @@
 import { useEffect, useRef } from "react";
 import socket from "../lib/socket";
-import type { TaskStatus } from "../types/index";
+import type { Task, TaskStatus } from "../types/index";
+
+// ─── Payload types ────────────────────────────────────────────────────────────
+
+export interface TaskSocketActor {
+  id: number;
+  name: string;
+  role?: string;
+  channel?: string;
+}
 
 export interface TaskUpdatedPayload {
   taskId: number;
   obraId: number;
-  responsableId: number | null;
+  title: string;
+  responsibleId: number | null;
   status: TaskStatus;
   estimatedProgress: number;
+  startDate: string | null;
   dueDate: string | null;
   updatedAt: string;
+  actor: TaskSocketActor | null;
 }
 
-/**
- * Subscribes to `task_updated` WebSocket events for the given obra.
- *
- * Uses a ref for the callback so this effect never re-runs when the
- * callback identity changes — no duplicate listeners, no stale closures.
- *
- * Connects the socket if not already connected, and disconnects on unmount
- * only if no other consumers are registered (socket is a shared singleton).
- */
-export function useTaskSocket(
-  obraId: number,
-  onTaskUpdated: (payload: TaskUpdatedPayload) => void
-): void {
-  const callbackRef = useRef(onTaskUpdated);
-  callbackRef.current = onTaskUpdated;
+export interface TaskCreatedPayload {
+  taskId: number;
+  obraId: number;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  estimatedProgress: number;
+  responsibleId: number | null;
+  startDate: string | null;
+  dueDate: string | null;
+  startTime: string | null;
+  dueTime: string | null;
+  orderIndex: number;
+  createdAt: string;
+  updatedAt: string;
+  actor: TaskSocketActor | null;
+}
+
+export interface TaskDeletedPayload {
+  taskId: number;
+  obraId: number;
+  title: string;
+  actor: TaskSocketActor | null;
+}
+
+// ─── Payload → Task mapper ────────────────────────────────────────────────────
+
+export function taskFromCreatedPayload(p: TaskCreatedPayload): Task {
+  return {
+    id: p.taskId,
+    obra_id: p.obraId,
+    title: p.title,
+    description: p.description,
+    status: p.status,
+    estimated_progress: p.estimatedProgress,
+    responsible_id: p.responsibleId,
+    start_date: p.startDate,
+    due_date: p.dueDate,
+    start_time: p.startTime,
+    due_time: p.dueTime,
+    order_index: p.orderIndex,
+    depends_on_id: null,
+    completed_date: null,
+    created_at: p.createdAt,
+    updated_at: p.updatedAt,
+  };
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+interface UseTaskSocketOptions {
+  obraId: number;
+  onTaskUpdated?: (payload: TaskUpdatedPayload) => void;
+  onTaskCreated?: (payload: TaskCreatedPayload) => void;
+  onTaskDeleted?: (payload: TaskDeletedPayload) => void;
+}
+
+export function useTaskSocket({
+  obraId,
+  onTaskUpdated,
+  onTaskCreated,
+  onTaskDeleted,
+}: UseTaskSocketOptions): void {
+  const updatedRef = useRef(onTaskUpdated);
+  const createdRef = useRef(onTaskCreated);
+  const deletedRef = useRef(onTaskDeleted);
+  updatedRef.current = onTaskUpdated;
+  createdRef.current = onTaskCreated;
+  deletedRef.current = onTaskDeleted;
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
 
-    function handler(payload: TaskUpdatedPayload) {
-      if (payload.obraId === obraId) {
-        callbackRef.current(payload);
-      }
+    function handleUpdated(p: TaskUpdatedPayload) {
+      if (p.obraId === obraId) updatedRef.current?.(p);
+    }
+    function handleCreated(p: TaskCreatedPayload) {
+      if (p.obraId === obraId) createdRef.current?.(p);
+    }
+    function handleDeleted(p: TaskDeletedPayload) {
+      if (p.obraId === obraId) deletedRef.current?.(p);
     }
 
-    socket.on("task_updated", handler);
+    socket.on("task_updated", handleUpdated);
+    socket.on("task_created", handleCreated);
+    socket.on("task_deleted", handleDeleted);
 
     return () => {
-      socket.off("task_updated", handler);
+      socket.off("task_updated", handleUpdated);
+      socket.off("task_created", handleCreated);
+      socket.off("task_deleted", handleDeleted);
     };
   }, [obraId]);
 }
