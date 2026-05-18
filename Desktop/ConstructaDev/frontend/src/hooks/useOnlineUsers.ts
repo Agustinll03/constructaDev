@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../lib/socket";
 import { useUser } from "../context/UserContext";
+import { fetchOnlineUsers } from "../api/presence";
 
 export interface OnlineUser {
   id: number;
@@ -9,17 +10,13 @@ export interface OnlineUser {
   color: string;
 }
 
-interface OnlineUsersPayload {
-  users: OnlineUser[];
-}
-
 interface PresencePayload {
   obra_id: number;
   viewers: OnlineUser[];
   editing: Record<string, OnlineUser>;
 }
 
-/** Usuarios conectados globalmente (excluye al usuario actual). */
+/** Usuarios online globalmente (excluye al usuario actual). Polling HTTP cada 10s. */
 export function useOnlineUsers(): OnlineUser[] {
   const { user } = useUser();
   const [online, setOnline] = useState<OnlineUser[]>([]);
@@ -27,25 +24,22 @@ export function useOnlineUsers(): OnlineUser[] {
   userIdRef.current = user.id;
 
   useEffect(() => {
-    if (!socket.connected) socket.connect();
+    let cancelled = false;
 
-    function handler({ users }: OnlineUsersPayload) {
-      setOnline(users.filter(u => u.id !== userIdRef.current));
+    async function poll() {
+      try {
+        const users = await fetchOnlineUsers();
+        if (!cancelled) setOnline(users.filter(u => u.id !== userIdRef.current));
+      } catch {
+        // silent — will retry on next interval
+      }
     }
 
-    function onConnect() {
-      socket.emit("request_online_users");
-    }
-
-    socket.on("online_users", handler);
-    socket.on("connect", onConnect);
-
-    // If already connected, request immediately (might have missed the initial broadcast)
-    if (socket.connected) socket.emit("request_online_users");
-
+    poll();
+    const interval = setInterval(poll, 10_000);
     return () => {
-      socket.off("online_users", handler);
-      socket.off("connect", onConnect);
+      cancelled = true;
+      clearInterval(interval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

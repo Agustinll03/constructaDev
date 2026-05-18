@@ -539,23 +539,29 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
 
             {/* Viewing users — other users in this obra */}
             {viewingUsers.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 7,
+                background: "#fff",
+                border: "1px solid #E6E7E5",
+                borderRadius: 99,
+                padding: "5px 12px 5px 6px",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+              }}>
                 {/* Avatar stack */}
                 <div style={{ display: "flex" }}>
                   {viewingUsers.slice(0, 3).map((u, i) => (
                     <div
                       key={u.id}
-                      title={u.name}
                       style={{
-                        width: 28, height: 28, borderRadius: 99, flexShrink: 0,
+                        width: 24, height: 24, borderRadius: 99,
                         background: u.color, color: "#fff",
-                        fontSize: 10, fontWeight: 700,
+                        fontSize: 9, fontWeight: 700,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontFamily: "'Plus Jakarta Sans', sans-serif",
-                        border: "2.5px solid #fff",
-                        marginLeft: i > 0 ? -8 : 0,
+                        border: "2px solid #fff",
+                        marginLeft: i > 0 ? -6 : 0,
                         zIndex: 3 - i, position: "relative",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.10)",
                       }}
                     >
                       {u.initials}
@@ -563,12 +569,12 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
                   ))}
                   {viewingUsers.length > 3 && (
                     <div style={{
-                      width: 28, height: 28, borderRadius: 99,
+                      width: 24, height: 24, borderRadius: 99,
                       background: "#F0F1EF", color: "#5B6770",
-                      fontSize: 10, fontWeight: 700,
+                      fontSize: 9, fontWeight: 700,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "2.5px solid #fff",
-                      marginLeft: -8, position: "relative",
+                      border: "2px solid #fff",
+                      marginLeft: -6, position: "relative",
                       fontFamily: "'Plus Jakarta Sans', sans-serif",
                     }}>
                       +{viewingUsers.length - 3}
@@ -576,28 +582,25 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
                   )}
                 </div>
 
-                {/* Label */}
+                {/* Dot + label */}
                 <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <span style={{
-                    width: 6, height: 6, borderRadius: 99,
+                    width: 5, height: 5, borderRadius: 99,
                     background: "#1F8A5B", flexShrink: 0,
-                    boxShadow: "0 0 0 3px rgba(31,138,91,0.20)",
+                    boxShadow: "0 0 0 2.5px rgba(31,138,91,0.18)",
                     animation: "pulse-green 2s ease-in-out infinite",
                   }} />
                   <span style={{
-                    fontSize: 12, color: "#5B6770",
+                    fontSize: 11.5, color: "#5B6770",
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
                     whiteSpace: "nowrap",
                   }}>
                     {viewingUsers.length === 1
-                      ? `${viewingUsers[0].name.split(" ")[0]} también está aquí`
+                      ? `${viewingUsers[0].name.includes("@") ? viewingUsers[0].name.split("@")[0] : viewingUsers[0].name.split(" ")[0]} también está aquí`
                       : `${viewingUsers.length} personas aquí`
                     }
                   </span>
                 </div>
-
-                {/* Divider */}
-                <div style={{ width: 1, height: 20, background: "#E6E7E5", flexShrink: 0 }} />
               </div>
             )}
 

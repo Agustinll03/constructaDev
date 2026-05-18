@@ -139,15 +139,29 @@ export function ResumenTab({
 
   const kpiTileStyle: CSSProperties = {
     background: "#fff",
-    border: "1px solid #E6E7E5",
-    borderRadius: 14,
-    padding: "16px 18px",
+    border: "1px solid #ECEEED",
+    borderRadius: 16,
+    padding: "18px 20px",
     display: "flex",
     flexDirection: "column",
-    gap: 10,
+    gap: 12,
     position: "relative",
     overflow: "hidden",
   };
+
+  const kpiLabelStyle: CSSProperties = {
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: 11, fontWeight: 600,
+    letterSpacing: "0.06em", textTransform: "uppercase" as const,
+    color: "#A0ABB4",
+  };
+
+  const kpiIconStyle = (bg: string, color: string): CSSProperties => ({
+    width: 32, height: 32, borderRadius: 10,
+    background: bg, color,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0,
+  });
 
   return (
     <div className="space-y-5">
@@ -168,8 +182,8 @@ export function ResumenTab({
         {/* ── KPI 1: Avance general (hero) ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Avance general</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FFF1E9", color: "#FF6B35", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Avance general</span>
+            <div style={kpiIconStyle("#FFF1E9", "#FF6B35")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8h3l2-5 3 10 2-5 4-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
           </div>
@@ -196,8 +210,8 @@ export function ResumenTab({
         {/* ── KPI 2: Tareas activas ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Tareas activas</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#E5EEFB", color: "#2A6FDB", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Tareas activas</span>
+            <div style={kpiIconStyle("#E5EEFB", "#2A6FDB")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>
             </div>
           </div>
@@ -210,8 +224,8 @@ export function ResumenTab({
         {/* ── KPI 3: Completadas ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Completadas</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#E4F3EC", color: "#1F8A5B", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Completadas</span>
+            <div style={kpiIconStyle("#E4F3EC", "#1F8A5B")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M5 8.2l2 2 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
             </div>
           </div>
@@ -224,8 +238,8 @@ export function ResumenTab({
         {/* ── KPI 4: Alertas activas ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Alertas activas</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FDF1DE", color: "#C97D0E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Alertas activas</span>
+            <div style={kpiIconStyle("#FDF1DE", "#C97D0E")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
             </div>
           </div>
@@ -244,8 +258,8 @@ export function ResumenTab({
         {/* ── KPI 5: Tareas críticas ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Críticas</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FCE5E5", color: "#D03A3A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Críticas</span>
+            <div style={kpiIconStyle("#FCE5E5", "#D03A3A")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 14c2.5 0 4.5-1.7 4.5-4.4 0-2-1.6-2.9-2.5-3.6.5-2 0-3.5-2-4 .5 2.5-2 4-3.7 5.4-.8.7-1.3 1.6-1.3 2.7C3 12.4 5.4 14 8 14z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/></svg>
             </div>
           </div>

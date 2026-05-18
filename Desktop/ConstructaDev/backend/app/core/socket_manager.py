@@ -30,6 +30,8 @@ sio = socketio.AsyncServer(
     cors_allowed_origins="*",
     logger=False,
     engineio_logger=False,
+    ping_interval=10,   # server pings client every 10s
+    ping_timeout=20,    # disconnect if no pong in 20s
 )
 
 _AVATAR_COLORS = ["#FF6B35", "#2A6FDB", "#1F8A5B", "#9A4DC9", "#C97D0E", "#D03A3A", "#2C6571"]
@@ -86,28 +88,41 @@ async def _broadcast_presence(obra_id: int) -> None:
 @sio.event
 async def connect(sid: str, environ: dict, auth: dict | None) -> None:
     token = (auth or {}).get("token", "")
+    logger.info("connect attempt sid=%s has_token=%s", sid, bool(token))
     if not token:
+        logger.warning("connect rejected sid=%s reason=no_token", sid)
         raise ConnectionRefusedError("no token")
     try:
         payload = decode_access_token(token)
         user_id = int(payload["sub"])
-    except (jwt.PyJWTError, KeyError, ValueError):
+    except jwt.ExpiredSignatureError:
+        logger.warning("connect rejected sid=%s reason=token_expired", sid)
+        raise ConnectionRefusedError("token expired")
+    except (jwt.PyJWTError, KeyError, ValueError) as exc:
+        logger.warning("connect rejected sid=%s reason=invalid_token exc=%s", sid, exc)
         raise ConnectionRefusedError("invalid token")
 
-    async with AsyncSessionLocal() as db:
-        from app.repositories.user import UserRepository
-        from app.repositories.obra import ObraRepository
-        user = await UserRepository(db).get(user_id)
-        if not user or not user.is_active:
-            raise ConnectionRefusedError("user inactive")
-        obras = await ObraRepository(db).list_all()
-        for obra in obras:
-            await sio.enter_room(sid, f"obra_{obra.id}")
+    try:
+        async with AsyncSessionLocal() as db:
+            from app.repositories.user import UserRepository
+            from app.repositories.obra import ObraRepository
+            user = await UserRepository(db).get(user_id)
+            if not user or not user.is_active:
+                logger.warning("connect rejected sid=%s user_id=%d reason=user_inactive_or_not_found", sid, user_id)
+                raise ConnectionRefusedError("user inactive")
+            obras = await ObraRepository(db).list_all()
+            for obra in obras:
+                await sio.enter_room(sid, f"obra_{obra.id}")
 
-    await sio.save_session(sid, {"user_id": user_id})
-    _sessions[sid] = _user_card(user_id, user.full_name)
-    await _broadcast_online()
-    logger.info("connect sid=%s user_id=%d name=%s sessions=%d", sid, user_id, user.full_name, len(_sessions))
+        await sio.save_session(sid, {"user_id": user_id})
+        _sessions[sid] = _user_card(user_id, user.full_name)
+        await _broadcast_online()
+        logger.info("connect OK sid=%s user_id=%d name=%s sessions=%d", sid, user_id, user.full_name, len(_sessions))
+    except ConnectionRefusedError:
+        raise
+    except Exception as exc:
+        logger.error("connect handler unexpected error sid=%s user_id=%d: %s", sid, user_id, exc, exc_info=True)
+        raise ConnectionRefusedError("server error")
 
 
 @sio.event

@@ -270,10 +270,10 @@ interface KpiCardProps {
 
 function KpiCard({ label, value, icon, iconBg, iconColor, delta, sparkColor, sparkPath }: KpiCardProps) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #E6E7E5", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+    <div style={{ background: "#fff", border: "1px solid #ECEEED", borderRadius: 16, padding: "18px 20px", position: "relative", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>{label}</span>
-        <div style={{ width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: iconBg, color: iconColor }}>
+        <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#A0ABB4" }}>{label}</span>
+        <div style={{ width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: iconBg, color: iconColor }}>
           {icon}
         </div>
       </div>
@@ -284,7 +284,7 @@ function KpiCard({ label, value, icon, iconBg, iconColor, delta, sparkColor, spa
         {delta}
       </div>
       {/* Sparkline */}
-      <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 36, opacity: 0.45 }} viewBox="0 0 200 40" preserveAspectRatio="none">
+      <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 36, opacity: 0.4 }} viewBox="0 0 200 40" preserveAspectRatio="none">
         <path d={sparkPath} stroke={sparkColor} strokeWidth="1.8" fill="none"/>
       </svg>
     </div>

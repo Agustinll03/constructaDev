@@ -156,29 +156,6 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
         </svg>
       </div>
 
-      {/* ── Search ── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 9,
-        background: "rgba(0,0,0,0.18)",
-        border: "1px solid rgba(255,255,255,0.05)",
-        borderRadius: 9, padding: "7px 10px",
-        margin: "0 2px 16px", color: "#8C969C",
-        fontSize: 12.5, cursor: "pointer",
-      }}>
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-          <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-        <span style={{ flex: 1 }}>Buscar…</span>
-        <kbd style={{
-          fontSize: 10, padding: "1px 6px", borderRadius: 4,
-          background: "rgba(255,255,255,0.05)",
-          color: "#8C969C",
-          border: "1px solid rgba(255,255,255,0.06)",
-          fontFamily: "'JetBrains Mono', monospace",
-        }}>⌘K</kbd>
-      </div>
-
       {/* ── WORKSPACE section ── */}
       <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "8px 10px 6px" }}>
         Workspace

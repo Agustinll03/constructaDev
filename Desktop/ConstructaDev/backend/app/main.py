@@ -2,7 +2,7 @@ import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import alerts, auth, events, notifications, obras, responsibles, tasks, uploads, users, webhooks
+from app.api.routes import alerts, auth, events, notifications, obras, presence, responsibles, tasks, uploads, users, webhooks
 from app.api.routes import settings as settings_router
 from app.core.config import settings
 from app.core.socket_manager import sio
@@ -39,6 +39,7 @@ fastapi_app.include_router(notifications.router, prefix=API_PREFIX)
 fastapi_app.include_router(settings_router.router, prefix=API_PREFIX)
 fastapi_app.include_router(events.router, prefix=API_PREFIX)
 fastapi_app.include_router(uploads.router, prefix=API_PREFIX)
+fastapi_app.include_router(presence.router, prefix=API_PREFIX)
 
 
 # Serve uploaded images — must be a proper route (not StaticFiles) to work
@@ -62,6 +63,7 @@ async def serve_uploaded_file(filename: str):
 @fastapi_app.get("/health", tags=["health"])
 async def health():
     return {"status": "ok", "app": settings.APP_NAME}
+
 
 
 # ── Top-level ASGI app: Socket.IO wraps FastAPI ────────────────────────────────
