@@ -4,6 +4,8 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { ActivityToast } from "./components/ActivityToast";
 import { ObraSetupWizard } from "./components/ObraSetupWizard";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
+import { BitacoraPage } from "./pages/BitacoraPage";
+import { PresupuestosPage } from "./pages/PresupuestosPage";
 import { ConfiguracionPage } from "./pages/ConfiguracionPage";
 import { EquipoPage } from "./pages/EquipoPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -36,6 +38,11 @@ function App() {
 
   const handleObraCounts = useCallback((counts: { tasks: number; alerts: number; responsibles: number }) => {
     setObraCounts(counts);
+  }, []);
+
+  const handleTabChange = useCallback((tab: ObraTab) => {
+    setActiveTab(tab);
+    setActivePage("panel");
   }, []);
 
   const inviteToken                     = getInviteToken();
@@ -107,6 +114,12 @@ function App() {
   } else if (activePage === "equipo") {
     pageTitle = "Gestión de equipo";
     pageSubtitle = "Miembros de la organización";
+  } else if (activePage === "bitacora") {
+    pageTitle = "Bitácora de Obra";
+    pageSubtitle = "Próximamente";
+  } else if (activePage === "presupuestos") {
+    pageTitle = "Gestión de Presupuestos";
+    pageSubtitle = "Próximamente";
   } else {
     pageTitle = "Configuración";
     pageSubtitle = "Ajustes del sistema";
@@ -115,7 +128,7 @@ function App() {
   function renderPage() {
     if (activePage === "panel") {
       return selectedObra ? (
-        <ObraDetailPage obra={selectedObra} activeTab={activeTab} onTabChange={setActiveTab} onCounts={handleObraCounts} />
+        <ObraDetailPage obra={selectedObra} activeTab={activeTab} onTabChange={handleTabChange} onCounts={handleObraCounts} />
       ) : (
         <PortfolioPage
           onSelectObra={handleSelectObra}
@@ -126,6 +139,8 @@ function App() {
       );
     }
     if (activePage === "equipo") return <EquipoPage />;
+    if (activePage === "bitacora") return <BitacoraPage />;
+    if (activePage === "presupuestos") return <PresupuestosPage />;
     return <ConfiguracionPage />;
   }
 
@@ -141,7 +156,7 @@ function App() {
         currentUser={user}
         selectedObra={selectedObra}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         obraCounts={obraCounts}
       >
         {renderPage()}

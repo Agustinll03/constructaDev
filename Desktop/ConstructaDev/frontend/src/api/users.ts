@@ -6,6 +6,7 @@ export interface ApiUser {
   full_name: string;
   role: "admin" | "collaborator";
   is_active: boolean;
+  avatar_url: string | null;
   created_at: string;
 }
 
@@ -31,4 +32,20 @@ export async function acceptInvite(token: string, full_name: string, password: s
 
 export async function removeMember(userId: number): Promise<void> {
   await apiClient.delete(`/users/${userId}`);
+}
+
+export async function updateProfile(data: { full_name?: string; avatar_url?: string | null }): Promise<ApiUser> {
+  const { data: res } = await apiClient.patch<ApiUser>("/users/me", data);
+  return res;
+}
+
+export async function changePassword(current_password: string, new_password: string): Promise<void> {
+  await apiClient.post("/users/me/password", { current_password, new_password });
+}
+
+export async function uploadAvatar(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await apiClient.post<{ url: string }>("/upload/image", form);
+  return data.url;
 }

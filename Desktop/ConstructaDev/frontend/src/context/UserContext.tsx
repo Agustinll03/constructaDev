@@ -22,15 +22,15 @@ export function userAvatarColor(userId: number): string {
   return AVATAR_COLORS[userId % AVATAR_COLORS.length];
 }
 
-function buildUser(api: { id: number; full_name: string; email: string; role: UserRole }): CurrentUser {
+function buildUser(api: { id: number; full_name: string; email: string; role: UserRole; avatar_url?: string | null }): CurrentUser {
   const initials = api.full_name
     .split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
   const color = userAvatarColor(api.id);
-  return { id: api.id, name: api.full_name, email: api.email, initials, color, role: api.role };
+  return { id: api.id, name: api.full_name, email: api.email, initials, color, role: api.role, avatar_url: api.avatar_url };
 }
 
 const PLACEHOLDER: CurrentUser = {
-  id: 0, name: "", email: "", initials: "?", color: "#8E97A0", role: "collaborator",
+  id: 0, name: "", email: "", initials: "?", color: "#8E97A0", role: "collaborator", avatar_url: null,
 };
 
 interface UserContextValue {

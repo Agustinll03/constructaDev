@@ -21,11 +21,10 @@ class Settings(BaseSettings):
     # URL of the frontend app — used to build invite links
     FRONTEND_URL: str = "http://localhost:5173"
 
-    # Gmail SMTP — required to send real invite emails
-    # Use a Google App Password (not your real password):
-    # myaccount.google.com → Security → App passwords
-    GMAIL_USER: str = ""
-    GMAIL_APP_PASSWORD: str = ""
+    # Brevo — transactional email API
+    BREVO_API_KEY: str = ""
+    BREVO_SENDER_EMAIL: str = "noreply@constructa.com"
+    BREVO_SENDER_NAME: str = "Constructa"
 
     # Phase 3 — AI (not active yet)
     ANTHROPIC_API_KEY: str = ""

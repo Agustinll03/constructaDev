@@ -20,7 +20,7 @@ export interface Obra {
   updated_at: string;
 }
 
-export type Page = "panel" | "configuracion" | "equipo";
+export type Page = "panel" | "configuracion" | "equipo" | "bitacora" | "presupuestos";
 
 export type ObraTab = "resumen" | "tareas" | "responsables" | "alertas" | "historial";
 
@@ -113,4 +113,5 @@ export interface CurrentUser {
   initials: string;
   color: string;
   role: "admin" | "collaborator";
+  avatar_url?: string | null;
 }

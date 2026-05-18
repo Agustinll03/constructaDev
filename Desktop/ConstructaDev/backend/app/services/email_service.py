@@ -1,29 +1,25 @@
 """
-Email service — sends transactional emails via Gmail SMTP.
+Email service — sends transactional emails via Brevo (brevo.com).
 
 Requires in .env:
-  GMAIL_USER=tu_cuenta@gmail.com
-  GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx   (Google App Password, 16 chars)
-
-If credentials are not configured the send is silently skipped so the rest
-of the invite flow still works (the caller gets the token back anyway).
+  BREVO_API_KEY=xkeysib-...
+  BREVO_SENDER_EMAIL=tu@email.com   (must be verified in Brevo dashboard)
+  BREVO_SENDER_NAME=Constructa
 """
-import asyncio
 import logging
-import smtplib
-import ssl
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+
+import requests
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
-def _build_invite_email(to_email: str, invite_url: str, role: str) -> MIMEMultipart:
+
+def _build_invite_html(invite_url: str, role: str) -> str:
     role_label = "Administrador" if role == "admin" else "Colaborador"
-
-    html = f"""
+    return f"""
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -39,9 +35,7 @@ def _build_invite_email(to_email: str, invite_url: str, role: str) -> MIMEMultip
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#1B2A34 0%,#243642 100%);padding:32px 40px;">
-              <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">
-                Constructa
-              </div>
+              <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">Constructa</div>
               <div style="font-size:12px;color:#8FA8B5;margin-top:4px;letter-spacing:0.06em;text-transform:uppercase;">
                 Plataforma de gestión de obras
               </div>
@@ -63,23 +57,19 @@ def _build_invite_email(to_email: str, invite_url: str, role: str) -> MIMEMultip
                 Hacé click en el botón para crear tu cuenta y empezar a trabajar.
               </p>
 
-              <!-- CTA -->
               <div style="text-align:center;margin:32px 0;">
                 <a href="{invite_url}"
-                   style="display:inline-block;padding:14px 36px;background:#FF6B35;color:#ffffff;font-size:15px;font-weight:700;border-radius:10px;text-decoration:none;letter-spacing:-0.01em;box-shadow:0 6px 20px -4px rgba(255,107,53,0.45);">
+                   style="display:inline-block;padding:14px 36px;background:#FF6B35;color:#ffffff;font-size:15px;font-weight:700;border-radius:10px;text-decoration:none;box-shadow:0 6px 20px -4px rgba(255,107,53,0.45);">
                   Aceptar invitación
                 </a>
               </div>
 
-              <!-- Info box -->
               <div style="background:#F4F5F4;border-radius:10px;padding:16px 20px;margin-top:8px;">
                 <p style="margin:0;font-size:12.5px;color:#8E97A0;line-height:1.6;">
-                  Si el botón no funciona, copiá este link en tu navegador:<br>
+                  Si el botón no funciona, copiá este link:<br>
                   <a href="{invite_url}" style="color:#FF6B35;word-break:break-all;">{invite_url}</a>
                 </p>
-                <p style="margin:10px 0 0;font-size:12px;color:#B0B8BF;">
-                  Este link expira en 72 horas.
-                </p>
+                <p style="margin:10px 0 0;font-size:12px;color:#B0B8BF;">Este link expira en 72 horas.</p>
               </div>
             </td>
           </tr>
@@ -102,44 +92,42 @@ def _build_invite_email(to_email: str, invite_url: str, role: str) -> MIMEMultip
 </html>
 """
 
-    plain = (
-        f"Fuiste invitado a Constructa como {role_label}.\n\n"
-        f"Aceptá la invitación en: {invite_url}\n\n"
-        "Este link expira en 72 horas."
-    )
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Te invitaron a Constructa"
-    msg["From"] = f"Constructa <{settings.GMAIL_USER}>"
-    msg["To"] = to_email
-    msg.attach(MIMEText(plain, "plain", "utf-8"))
-    msg.attach(MIMEText(html, "html", "utf-8"))
-    return msg
-
-
-def _send_sync(to_email: str, invite_url: str, role: str) -> None:
-    """Blocking SMTP call — run in a thread so it doesn't block the event loop."""
-    if not settings.GMAIL_USER or not settings.GMAIL_APP_PASSWORD:
-        logger.warning("Email not configured (GMAIL_USER / GMAIL_APP_PASSWORD missing) — skipping send")
-        return
-
-    msg = _build_invite_email(to_email, invite_url, role)
-    context = ssl.create_default_context()
-
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.ehlo()
-        server.starttls(context=context)
-        server.login(settings.GMAIL_USER, settings.GMAIL_APP_PASSWORD)
-        server.sendmail(settings.GMAIL_USER, to_email, msg.as_string())
-
-    logger.info("Invite email sent to %s", to_email)
-
 
 async def send_invite_email(to_email: str, invite_url: str, role: str) -> None:
-    """Send invite email without blocking the async event loop."""
+    if not settings.BREVO_API_KEY:
+        logger.warning("BREVO_API_KEY not configured — skipping email send")
+        return
+
+    role_label = "Administrador" if role == "admin" else "Colaborador"
+
+    payload = {
+        "sender": {
+            "name": settings.BREVO_SENDER_NAME,
+            "email": settings.BREVO_SENDER_EMAIL,
+        },
+        "to": [{"email": to_email}],
+        "subject": "Te invitaron a Constructa",
+        "htmlContent": _build_invite_html(invite_url, role),
+        "textContent": (
+            f"Fuiste invitado a Constructa como {role_label}.\n\n"
+            f"Aceptá la invitación en: {invite_url}\n\n"
+            "Este link expira en 72 horas."
+        ),
+    }
+
     try:
-        await asyncio.get_event_loop().run_in_executor(
-            None, _send_sync, to_email, invite_url, role
+        response = requests.post(
+            BREVO_URL,
+            json=payload,
+            headers={
+                "api-key": settings.BREVO_API_KEY,
+                "Content-Type": "application/json",
+            },
+            timeout=10,
         )
+        response.raise_for_status()
+        logger.info("Invite email sent to %s via Brevo (messageId=%s)", to_email, response.json().get("messageId"))
+    except requests.HTTPError as exc:
+        logger.error("Brevo API error sending to %s: %s — %s", to_email, exc, exc.response.text)
     except Exception as exc:
         logger.error("Failed to send invite email to %s: %s", to_email, exc)

@@ -1,10 +1,25 @@
-import { LogOut } from "lucide-react";
+import {
+  Squares2X2Icon,
+  ChartBarIcon,
+  ClipboardDocumentListIcon,
+  UserPlusIcon,
+  BellIcon,
+  ClockIcon,
+  UsersIcon,
+  Cog6ToothIcon,
+  ChatBubbleLeftEllipsisIcon,
+  DocumentTextIcon,
+  ChevronDownIcon,
+  ArrowRightStartOnRectangleIcon,
+} from "@heroicons/react/24/outline";
 import type { Obra, ObraStatus, ObraTab, Page } from "../../types";
 
 const HERO_DOT_COLORS = ["#FF8856","#3D8BFF","#2AC58A","#B07CF7","#8FA8B5","#E8B14A","#5DA8B5"];
 const STATUS_PCT: Record<ObraStatus, number> = {
   planificada: 5, en_progreso: 50, pausada: 30, completada: 100, cancelada: 0,
 };
+
+const ICON_SIZE = { width: 15, height: 15 };
 
 interface SidebarProps {
   activePage: Page;
@@ -109,17 +124,11 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
 
       {/* ── Brand ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 6px 14px" }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-          background: "linear-gradient(160deg, #FF6B35 0%, #E85A26 100%)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px -6px rgba(255,107,53,0.6)",
-        }}>
-          <svg width="16" height="16" viewBox="0 0 22 22" fill="none">
-            <path d="M3 19V8.5L11 3l8 5.5V19H3z" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round"/>
-            <path d="M8 19v-6h5v6" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round"/>
-          </svg>
-        </div>
+        <img
+          src="/logo.png"
+          alt="Constructa"
+          style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, objectFit: "cover" }}
+        />
         <div>
           <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: "0.04em" }}>
             CONSTRUCTA
@@ -151,9 +160,7 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
           <div style={{ color: "#fff", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Estudio Velar</div>
           <div style={{ fontSize: 10.5, color: "#8C969C", letterSpacing: "0.04em" }}>Workspace</div>
         </div>
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ color: "#6B767E", flexShrink: 0 }}>
-          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        <ChevronDownIcon style={{ width: 12, height: 12, color: "#6B767E", flexShrink: 0 }} />
       </div>
 
       {/* ── WORKSPACE section ── */}
@@ -165,7 +172,7 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
           label="Panel"
           active={activePage === "panel" && !selectedObra}
           onClick={() => onNavigate("panel")}
-          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="9" y="9" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none"/></svg>}
+          icon={<Squares2X2Icon style={ICON_SIZE} />}
         />
 
         {selectedObra && onTabChange && (
@@ -192,37 +199,37 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
 
             <NavItem
               label="Resumen"
-              active={activeTab === "resumen"}
+              active={activePage === "panel" && activeTab === "resumen"}
               onClick={() => onTabChange("resumen")}
-              icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="9" width="3" height="5" rx="0.8" fill="currentColor" opacity="0.85"/><rect x="6.5" y="6" width="3" height="8" rx="0.8" fill="currentColor" opacity="0.85"/><rect x="11" y="3" width="3" height="11" rx="0.8" fill="currentColor" opacity="0.85"/></svg>}
+              icon={<ChartBarIcon style={ICON_SIZE} />}
             />
             <NavItem
               label="Tareas"
-              active={activeTab === "tareas"}
+              active={activePage === "panel" && activeTab === "tareas"}
               count={obraCounts?.tasks}
               onClick={() => onTabChange("tareas")}
-              icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M6 4.5h7M6 8h7M6 11.5h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M3 4l.6.6L4.8 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 7.5l.6.6 1.2-1.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 11l.6.6 1.2-1.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+              icon={<ClipboardDocumentListIcon style={ICON_SIZE} />}
             />
             <NavItem
               label="Responsables"
-              active={activeTab === "responsables"}
+              active={activePage === "panel" && activeTab === "responsables"}
               count={obraCounts?.responsibles}
               onClick={() => onTabChange("responsables")}
-              icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M1.5 13.5c.4-2.2 2.2-3.8 4.5-3.8s4.1 1.6 4.5 3.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M11 9.5v3.5M9.5 11h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+              icon={<UserPlusIcon style={ICON_SIZE} />}
             />
             <NavItem
               label="Alertas"
-              active={activeTab === "alertas"}
+              active={activePage === "panel" && activeTab === "alertas"}
               count={obraCounts?.alerts}
               countOrange={(obraCounts?.alerts ?? 0) > 0}
               onClick={() => onTabChange("alertas")}
-              icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 12V8a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M6 14a2 2 0 004 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+              icon={<BellIcon style={ICON_SIZE} />}
             />
             <NavItem
               label="Historial"
-              active={activeTab === "historial"}
+              active={activePage === "panel" && activeTab === "historial"}
               onClick={() => onTabChange("historial")}
-              icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4"/><path d="M8 5.5V8l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+              icon={<ClockIcon style={ICON_SIZE} />}
             />
           </>
         )}
@@ -237,7 +244,7 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
           label="Gestión de equipo"
           active={activePage === "equipo"}
           onClick={() => onNavigate("equipo")}
-          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="6" r="2.4" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M2.5 13c.4-2 1.8-3.3 3.5-3.3S9.1 11 9.5 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/><path d="M10.5 4.5a2.2 2.2 0 010 4.3M11.5 9.7c1.5.3 2.5 1.6 2.8 3.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>}
+          icon={<UsersIcon style={ICON_SIZE} />}
         />
       </nav>
 
@@ -250,9 +257,52 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
           label="Configuración"
           active={activePage === "configuracion"}
           onClick={() => onNavigate("configuracion")}
-          icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 1.8v1.8M8 12.4v1.8M14.2 8h-1.8M3.6 8H1.8M12.4 3.6l-1.3 1.3M4.9 11.1l-1.3 1.3M12.4 12.4l-1.3-1.3M4.9 4.9L3.6 3.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+          icon={<Cog6ToothIcon style={ICON_SIZE} />}
         />
       </nav>
+
+      {/* ── PRÓXIMAMENTE section — solo con obra seleccionada ── */}
+      {selectedObra && (
+        <>
+          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
+            Próximamente
+          </div>
+          <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {(["bitacora", "presupuestos"] as const).map((page) => {
+              const meta = {
+                bitacora:     { label: "Bitácora de Obra", icon: <ChatBubbleLeftEllipsisIcon style={ICON_SIZE} /> },
+                presupuestos: { label: "Presupuestos",     icon: <DocumentTextIcon style={ICON_SIZE} /> },
+              }[page];
+              const isActive = activePage === page;
+              return (
+                <button
+                  key={page}
+                  onClick={() => onNavigate(page)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 11,
+                    padding: "7px 10px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                    textAlign: "left", cursor: "pointer", border: "none",
+                    transition: "background 0.12s",
+                    background: isActive ? "linear-gradient(180deg, rgba(255,107,53,0.18), rgba(255,107,53,0.08))" : "transparent",
+                    boxShadow: isActive ? "inset 0 0 0 1px rgba(255,107,53,0.25)" : "none",
+                    color: isActive ? "#fff" : "#CFD4D7",
+                  }}
+                  onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                >
+                  <span style={{ width: 16, display: "inline-flex", justifyContent: "center", color: isActive ? "#FF6B35" : "inherit", opacity: isActive ? 1 : 0.65, flexShrink: 0 }}>
+                    {meta.icon}
+                  </span>
+                  <span style={{ flex: 1 }}>{meta.label}</span>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 99, background: "rgba(255,107,53,0.18)", color: "#FF6B35", letterSpacing: "0.04em", flexShrink: 0 }}>
+                    PRONTO
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </>
+      )}
 
       {/* ── Spacer ── */}
       <div style={{ flex: 1 }} />
@@ -309,7 +359,7 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
           onMouseEnter={e => (e.currentTarget.style.color = "#CFD4D7")}
           onMouseLeave={e => (e.currentTarget.style.color = "#6B767E")}
         >
-          <LogOut style={{ width: 14, height: 14 }} />
+          <ArrowRightStartOnRectangleIcon style={{ width: 15, height: 15 }} />
         </button>
       </div>
     </aside>

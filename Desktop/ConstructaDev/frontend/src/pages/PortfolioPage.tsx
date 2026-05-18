@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, Plus, Search, Pin } from "lucide-react";
+import { PlusIcon, MagnifyingGlassIcon, MapPinIcon } from "@heroicons/react/24/outline";
 import { fetchObras } from "../api/obras";
 import { fetchMembers, type ApiUser } from "../api/users";
 import { userAvatarColor } from "../context/UserContext";
@@ -151,7 +151,7 @@ function ObraCard({ obra, onSelect, isPinned, onTogglePin, members }: { obra: Ob
           onMouseEnter={e => { if (!isPinned) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.50)"; }}
           onMouseLeave={e => { if (!isPinned) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.30)"; }}
         >
-          <Pin style={{ width: 12, height: 12 }} />
+          <MapPinIcon style={{ width: 12, height: 12 }} />
         </button>
 
         {/* Status pill */}
@@ -367,7 +367,7 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* Search */}
           <div style={{ position: "relative" }}>
-            <Search style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, color: "#8E97A0", pointerEvents: "none" }} />
+            <MagnifyingGlassIcon style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, color: "#8E97A0", pointerEvents: "none" }} />
             <input
               type="text"
               placeholder="Buscar obras…"
@@ -398,16 +398,6 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
             )}
           </div>
 
-          {/* Refresh */}
-          <button
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-            title="Actualizar"
-            style={{ width: 36, height: 36, borderRadius: 10, background: "#fff", border: "1px solid #E6E7E5", display: "flex", alignItems: "center", justifyContent: "center", color: "#5B6770", cursor: "pointer", opacity: refreshing ? 0.5 : 1 }}
-          >
-            <RefreshCw style={{ width: 13, height: 13, animation: refreshing ? "spin 1s linear infinite" : "none" }} />
-          </button>
-
           {/* Nueva obra */}
           {canCreateObra && (
             <button
@@ -416,7 +406,7 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
               onMouseEnter={e => (e.currentTarget.style.background = "#E85A26")}
               onMouseLeave={e => (e.currentTarget.style.background = "#FF6B35")}
             >
-              <Plus style={{ width: 13, height: 13 }} />
+              <PlusIcon style={{ width: 13, height: 13 }} />
               Nueva obra
             </button>
           )}
@@ -491,7 +481,7 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
                   onClick={onNewObra}
                   style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, background: "#FF6B35", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 6px 14px -6px rgba(255,107,53,0.55)" }}
                 >
-                  <Plus style={{ width: 13, height: 13 }} />
+                  <PlusIcon style={{ width: 13, height: 13 }} />
                   Crear primera obra
                 </button>
               )}
@@ -590,7 +580,7 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
                     >
                       <div>
                         <div style={{ width: 44, height: 44, borderRadius: 99, background: "rgba(255,107,53,0.10)", color: "#FF6B35", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                          <Plus style={{ width: 18, height: 18 }} />
+                          <PlusIcon style={{ width: 18, height: 18 }} />
                         </div>
                         <h4 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 15, margin: "0 0 4px", color: "#1A2329" }}>Crear nueva obra</h4>
                         <p style={{ margin: 0, fontSize: 12, color: "#8E97A0", maxWidth: 200 }}>Empezá un proyecto desde cero.</p>
