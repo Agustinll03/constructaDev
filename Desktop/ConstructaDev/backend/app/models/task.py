@@ -18,7 +18,6 @@ class TaskStatus(str, enum.Enum):
     PENDIENTE = "pendiente"
     EN_PROGRESO = "en_progreso"
     BLOQUEADA = "bloqueada"
-    EN_REVISION = "en_revision"
     COMPLETADA = "completada"
     CANCELADA = "cancelada"
 

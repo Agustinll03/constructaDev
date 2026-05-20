@@ -16,7 +16,7 @@ class TaskCreate(BaseModel):
     depends_on_id: int | None = None
 
     @model_validator(mode="after")
-    def due_after_start(self) -> "TaskCreate":
+    def validate_dates(self) -> "TaskCreate":
         if self.start_date and self.due_date and self.due_date < self.start_date:
             raise ValueError("due_date must be after start_date")
         return self
@@ -34,7 +34,7 @@ class TaskUpdate(BaseModel):
     depends_on_id: int | None = None
 
     @model_validator(mode="after")
-    def due_after_start(self) -> "TaskUpdate":
+    def validate_dates(self) -> "TaskUpdate":
         if self.start_date and self.due_date and self.due_date < self.start_date:
             raise ValueError("due_date must be after start_date")
         return self
@@ -47,7 +47,6 @@ class TaskRead(BaseModel):
     description: str | None
     status: TaskStatus
     responsible_id: int | None
-    estimated_progress: int
     start_date: date | None
     start_time: time | None
     due_date: date | None
@@ -68,7 +67,6 @@ class TaskDueSoonRead(BaseModel):
     title: str
     status: TaskStatus
     due_date: date | None
-    estimated_progress: int
     responsible_id: int | None
     responsible_name: str | None
     responsible_whatsapp: str | None
@@ -77,7 +75,7 @@ class TaskDueSoonRead(BaseModel):
 class TaskStatusUpdate(BaseModel):
     """Used by the AI pipeline (Phase 2) — not a public HTTP endpoint."""
     status: TaskStatus
-    estimated_progress: int = Field(..., ge=0, le=100)
+    estimated_progress: int = Field(0, ge=0, le=100)
     completed_date: date | None = None
     triggered_by: str = "system"
     reason: str | None = None

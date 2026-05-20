@@ -10,6 +10,7 @@ class AlertType(str, enum.Enum):
     DELAY_RISK = "delay_risk"
     TASK_OVERDUE = "task_overdue"
     NO_RESPONSE = "no_response"
+    RESCHEDULE_REQUESTED = "reschedule_requested"
 
 
 class Alert(Base):

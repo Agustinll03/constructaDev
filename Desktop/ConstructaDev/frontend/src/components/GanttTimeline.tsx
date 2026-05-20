@@ -9,7 +9,8 @@ const ROW_H      = 60;   // px per task row
 const TASK_COL_W = 280;  // px for the fixed left name column
 const BAR_H      = 34;   // px bar height
 
-const TODAY_STR = new Date().toISOString().slice(0, 10);
+const _now      = new Date();
+const TODAY_STR = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,"0")}-${String(_now.getDate()).padStart(2,"0")}`;
 const TODAY_MS  = new Date(TODAY_STR).getTime();
 const DAY_MS    = 86_400_000;
 const CLICK_THRESHOLD_PX = 5;
@@ -24,10 +25,9 @@ const currentMonthLabel = `${MONTH_NAMES[NOW.getMonth()]} · ${NOW.getFullYear()
 // ─── Status visual system ─────────────────────────────────────────────────────
 
 const STATUS_STYLE: Record<TaskStatus, { bg: string; border: string; stripe: string; dot: string; label: string; badge: string | null }> = {
-  pendiente:   { bg: "#FFFAEB", border: "#E89B14", stripe: "#E89B14", dot: "#E89B14", label: "Pendiente",   badge: null },
-  en_progreso: { bg: "#FFF1E9", border: "#E85A26", stripe: "#E85A26", dot: "#E85A26", label: "En progreso", badge: null },
-  bloqueada:   { bg: "#FCE5E5", border: "#D03A3A", stripe: "#D03A3A", dot: "#D03A3A", label: "Bloqueada",   badge: "Vencida" },
-  en_revision: { bg: "#E5EEFB", border: "#2A6FDB", stripe: "#2A6FDB", dot: "#2A6FDB", label: "En revisión", badge: "Revisión" },
+  pendiente:   { bg: "#EBF3FF", border: "#3B82F6", stripe: "#3B82F6", dot: "#3B82F6", label: "Pendiente",   badge: null },
+  en_progreso: { bg: "#FFFBEB", border: "#D97706", stripe: "#D97706", dot: "#D97706", label: "En progreso", badge: null },
+  bloqueada:   { bg: "#FCE5E5", border: "#D03A3A", stripe: "#D03A3A", dot: "#D03A3A", label: "Bloqueada",   badge: null },
   completada:  { bg: "#E4F3EC", border: "#1F8A5B", stripe: "#1F8A5B", dot: "#1F8A5B", label: "Completada",  badge: "Completada" },
   cancelada:   { bg: "#F4F5F4", border: "#94928D", stripe: "#94928D", dot: "#94928D", label: "Cancelada",   badge: "Cancelada" },
 };
@@ -48,6 +48,7 @@ function dateToOffset(dateStr: string): number {
   return Math.round((ms(dateStr) - TODAY_MS) / DAY_MS);
 }
 
+
 function offsetToDate(offset: number): string {
   return new Date(TODAY_MS + offset * DAY_MS).toISOString().slice(0, 10);
 }
@@ -57,7 +58,7 @@ function fmtShort(dateStr: string): string {
   return `${day}/${m}`;
 }
 
-function isWeekend(d: Date): boolean { return d.getDay() === 0 || d.getDay() === 6; }
+function isWeekend(d: Date): boolean { return d.getUTCDay() === 0 || d.getUTCDay() === 6; }
 
 function avatarColor(name: string): string {
   let h = 0;
@@ -71,7 +72,9 @@ function getInitials(name: string): string {
 
 // ─── Status dot ───────────────────────────────────────────────────────────────
 
-function StatusDot({ status }: { status: TaskStatus }) {
+const STATUS_ORDER: TaskStatus[] = ["pendiente", "en_progreso", "bloqueada", "completada", "cancelada"];
+
+function StatusDotVisual({ status }: { status: TaskStatus }) {
   const { dot } = STATUS_STYLE[status];
   const base = { width: 16, height: 16, borderRadius: 99, flexShrink: 0 } as const;
   if (status === "completada")
@@ -88,7 +91,6 @@ function StatusDot({ status }: { status: TaskStatus }) {
     return <div style={{ ...base, border: "2px dashed #94928D", background: "repeating-linear-gradient(45deg,transparent 0 2px,#D5D7D3 2px 3px)" }} />;
   if (status === "pendiente")
     return <div style={{ ...base, border: `2px dashed ${dot}` }} />;
-  // bloqueada, en_revision
   return <div style={{ ...base, border: `2px solid ${dot}` }} />;
 }
 
@@ -97,7 +99,7 @@ function StatusDot({ status }: { status: TaskStatus }) {
 interface DragState    { taskId: number; startClientX: number; currentDeltaPx: number; }
 interface ResizeState  { taskId: number; edge: "start" | "end"; startClientX: number; currentDeltaPx: number; }
 interface PendingReschedule { task: Task; newStartDate: string | null; newDueDate: string | null; nearbyCount: number; mode: "move" | "resize-start" | "resize-end"; }
-interface PendingSchedule   { task: Task; dropDate: string; }
+interface PendingSchedule   { task: Task; dropDate: string; insertIdx: number; }
 interface RowDragState { taskId: number; startY: number; currentDeltaY: number; }
 
 interface GanttTimelineProps {
@@ -107,6 +109,7 @@ interface GanttTimelineProps {
   obraExpectedEndDate?: string | null;
   onSaved: () => void;
   onEditTask: (task: Task) => void;
+  onStatusChange?: (task: Task, newStatus: TaskStatus) => void;
   tasksWithoutDates?: number;
 }
 
@@ -119,6 +122,7 @@ export function GanttTimeline({
   obraExpectedEndDate,
   onSaved,
   onEditTask,
+  onStatusChange,
   tasksWithoutDates = 0,
 }: GanttTimelineProps) {
   // ── View switcher state ──────────────────────────────────────────────────────
@@ -136,9 +140,30 @@ export function GanttTimeline({
   const [highlightedId,   setHighlightedId]   = useState<number | null>(null);
   const [isDragOver,      setIsDragOver]      = useState(false);
   const [hoveredRowId,    setHoveredRowId]    = useState<number | null>(null);
+  const [statusDrop,      setStatusDrop]      = useState<{ taskId: number; x: number; y: number } | null>(null);
+  const [dragOverInfo,    setDragOverInfo]    = useState<{ clientX: number; clientY: number; date: string } | null>(null);
+
+  // ── Close status dropdown on outside click ───────────────────────────────────
+  useEffect(() => {
+    if (!statusDrop) return;
+    function handleDown(e: MouseEvent) {
+      const el = document.getElementById("gantt-status-drop");
+      if (el && !el.contains(e.target as Node)) setStatusDrop(null);
+    }
+    document.addEventListener("mousedown", handleDown);
+    return () => document.removeEventListener("mousedown", handleDown);
+  }, [statusDrop]);
 
   // ── Row reorder state ────────────────────────────────────────────────────────
-  const [rowOrder,   setRowOrder]   = useState<number[]>([]);
+  const storageKey = `gantt_order_${tasks[0]?.obra_id ?? "unknown"}`;
+  const rowDragMovedRef = useRef(false);
+
+  const [rowOrder,   setRowOrder]   = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [rowDrag,    setRowDrag]    = useState<RowDragState | null>(null);
   const rowDragRef   = useRef<RowDragState | null>(null);
   const orderedVisRef = useRef<Task[]>([]);
@@ -149,6 +174,8 @@ export function GanttTimeline({
   const railRef       = useRef<HTMLDivElement>(null);
   const scrollRef     = useRef<HTMLDivElement>(null);
   const stateRef      = useRef<{ visible: Task[]; rangeStart: number }>({ visible: [], rangeStart: 0 });
+  const autoScrollRaf = useRef<number | null>(null);
+  const autoScrollVel = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
 
   useEffect(() => { onEditRef.current = onEditTask; }, [onEditTask]);
 
@@ -164,16 +191,24 @@ export function GanttTimeline({
   ];
   orderedVisRef.current = orderedVisible;
 
-  // Sync rowOrder when visible tasks change
+  // Sync rowOrder when visible tasks change (add new, remove deleted)
   useEffect(() => {
     setRowOrder(prev => {
       const prevSet = new Set(prev);
-      const newIds = visible.filter(t => !prevSet.has(t.id)).map(t => t.id);
-      const removed = prev.filter(id => visibleById.has(id));
-      return [...removed, ...newIds];
+      const newIds  = visible.filter(t => !prevSet.has(t.id)).map(t => t.id);
+      const merged  = [...prev.filter(id => visibleById.has(id)), ...newIds];
+      try { localStorage.setItem(storageKey, JSON.stringify(merged)); } catch { /* ignore */ }
+      return merged;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible.map(t => t.id).join(",")]);
+
+  // Persist order to localStorage whenever the user reorders
+  useEffect(() => {
+    if (rowOrder.length === 0) return;
+    try { localStorage.setItem(storageKey, JSON.stringify(rowOrder)); } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowOrder]);
 
   let rangeStart: number;
   let rangeEnd: number;
@@ -206,12 +241,22 @@ export function GanttTimeline({
     let start = task.start_date;
     let due   = task.due_date;
     if (deltaDays === 0) return { start, due };
-    if (resizeEdge === "start" && start) {
-      start = addDays(start, deltaDays);
-      if (due && start >= due) start = addDays(due, -1);
-    } else if (resizeEdge === "end" && due) {
-      due = addDays(due, deltaDays);
-      if (start && due <= start) due = addDays(start, 1);
+    if (resizeEdge === "start") {
+      if (start) {
+        start = addDays(start, deltaDays);
+        if (due && start > due) start = due;
+      } else if (due) {
+        start = addDays(due, deltaDays + 1);  // due-only: shift +1 so 1 day left = same day
+        if (start > due) start = due;
+      }
+    } else if (resizeEdge === "end") {
+      if (due) {
+        due = addDays(due, deltaDays);
+        if (start && due < start) due = start;
+      } else if (start) {
+        due = addDays(start, deltaDays - 1);  // start-only: shift -1 so 1 day right = same day
+        if (due < start) due = start;
+      }
     } else {
       if (start) start = addDays(start, deltaDays);
       if (due)   due   = addDays(due,   deltaDays);
@@ -266,6 +311,7 @@ export function GanttTimeline({
       if (!task) return;
       const newStart = task.start_date ? addDays(task.start_date, deltaDays) : null;
       const newDue   = task.due_date   ? addDays(task.due_date,   deltaDays) : null;
+      if (newStart === task.start_date && newDue === task.due_date) return;
       const eps = [newStart, newDue].filter(Boolean).map(d => ms(d!));
       const nearbyCount = vis.filter(t => t.id !== task.id && [t.start_date, t.due_date]
         .filter(Boolean).some(d => eps.some(ep => Math.abs(ms(d!) - ep) <= 3 * DAY_MS))).length;
@@ -277,17 +323,22 @@ export function GanttTimeline({
       const deltaDays = Math.round(curResize.currentDeltaPx / currentDayW);
       if (Math.abs(deltaDays) < 1) return;
       const task = vis.find(t => t.id === curResize.taskId);
-      if (!task || !task.start_date || !task.due_date) return;
+      if (!task) return;
       let newStart = task.start_date;
       let newDue   = task.due_date;
       if (curResize.edge === "start") {
-        newStart = addDays(task.start_date, deltaDays);
-        if (newStart >= task.due_date) newStart = addDays(task.due_date, -1);
+        const base  = task.start_date ?? task.due_date!;
+        const shift = !task.start_date ? 1 : 0;  // due-only: shift +1
+        newStart = addDays(base, deltaDays + shift);
+        if (newDue && newStart > newDue) newStart = newDue;
       } else {
-        newDue = addDays(task.due_date, deltaDays);
-        if (newDue <= task.start_date) newDue = addDays(task.start_date, 1);
+        const base  = task.due_date ?? task.start_date!;
+        const shift = !task.due_date ? -1 : 0;   // start-only: shift -1
+        newDue = addDays(base, deltaDays + shift);
+        if (newStart && newDue < newStart) newDue = newStart;
       }
-      const eps = [ms(newStart), ms(newDue)];
+      if (newStart === task.start_date && newDue === task.due_date) return;
+      const eps = [newStart, newDue].filter(Boolean).map(d => ms(d!));
       const nearbyCount = vis.filter(t => t.id !== task.id && [t.start_date, t.due_date]
         .filter(Boolean).some(d => eps.some(ep => Math.abs(ms(d!) - ep) <= 3 * DAY_MS))).length;
       const mode: PendingReschedule["mode"] = curResize.edge === "start" ? "resize-start" : "resize-end";
@@ -341,6 +392,10 @@ export function GanttTimeline({
       rowDragRef.current = null;
       setRowDrag(null);
       if (!cur) return;
+      if (Math.abs(cur.currentDeltaY) > 5) {
+        rowDragMovedRef.current = true;
+        setTimeout(() => { rowDragMovedRef.current = false; }, 0);
+      }
       const ord = orderedVisRef.current;
       const origIdx = ord.findIndex(t => t.id === cur.taskId);
       const targetIdx = Math.max(0, Math.min(ord.length - 1, origIdx + Math.round(cur.currentDeltaY / ROW_H)));
@@ -373,21 +428,68 @@ export function GanttTimeline({
 
   // ── HTML5 DnD ──────────────────────────────────────────────────────────────
 
+  function stopAutoScroll() {
+    if (autoScrollRaf.current !== null) {
+      cancelAnimationFrame(autoScrollRaf.current);
+      autoScrollRaf.current = null;
+    }
+    autoScrollVel.current = { dx: 0, dy: 0 };
+  }
+
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
     if (!e.dataTransfer.types.includes(DND_TYPE)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
     setIsDragOver(true);
+
+    // ── Edge auto-scroll ──────────────────────────────────────────────────────
+    const scrollEl = scrollRef.current;
+    if (scrollEl) {
+      const sr    = scrollEl.getBoundingClientRect();
+      const EDGE  = 80;
+      const SPEED = 14;
+      let dx = 0;
+      // Horizontal: Gantt grid edges → scrolls grid left/right
+      const dLeft   = e.clientX - sr.left;
+      const dRight  = sr.right  - e.clientX;
+      if (dLeft  > 0 && dLeft  < EDGE) dx = -Math.ceil(SPEED * (1 - dLeft  / EDGE));
+      if (dRight > 0 && dRight < EDGE) dx =  Math.ceil(SPEED * (1 - dRight / EDGE));
+      autoScrollVel.current = { dx, dy: 0 };
+      if (dx !== 0 && autoScrollRaf.current === null) {
+        function loop() {
+          const { dx } = autoScrollVel.current;
+          if (dx === 0) { autoScrollRaf.current = null; return; }
+          if (scrollRef.current) scrollRef.current.scrollLeft += dx;
+          autoScrollRaf.current = requestAnimationFrame(loop);
+        }
+        autoScrollRaf.current = requestAnimationFrame(loop);
+      } else if (dx === 0) {
+        stopAutoScroll();
+      }
+    }
+
+    // ── Cursor date tooltip ───────────────────────────────────────────────────
+    const railRect = railRef.current?.getBoundingClientRect();
+    if (railRect) {
+      const xPx    = e.clientX - railRect.left;
+      const offset = rangeStart + Math.floor(xPx / dayWRef.current);
+      setDragOverInfo({ clientX: e.clientX, clientY: e.clientY, date: offsetToDate(offset) });
+    }
   }
 
   function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setIsDragOver(false);
+    setDragOverInfo(null);
+    stopAutoScroll();
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
+    const insertIdx = orderedVisRef.current.length;
     setIsDragOver(false);
+    setDragOverInfo(null);
+    stopAutoScroll();
     const rawId  = e.dataTransfer.getData(DND_TYPE);
     const taskId = parseInt(rawId, 10);
     if (!rawId || isNaN(taskId)) return;
@@ -397,7 +499,7 @@ export function GanttTimeline({
     if (!rect) return;
     const xPx    = e.clientX - rect.left;
     const offset = rangeStart + Math.floor(xPx / dayWRef.current);
-    setPendingSchedule({ task, dropDate: offsetToDate(offset) });
+    setPendingSchedule({ task, dropDate: offsetToDate(offset), insertIdx });
   }
 
   function handleRescheduleSaved(task: Task) {
@@ -407,14 +509,26 @@ export function GanttTimeline({
     onSaved();
   }
 
-  function handleScheduleSaved(task: Task) {
+  function handleScheduleSaved(savedTask: Task) {
+    const insertIdx = pendingSchedule?.insertIdx ?? orderedVisRef.current.length;
     setPendingSchedule(null);
-    setHighlightedId(task.id);
+    setHighlightedId(savedTask.id);
     setTimeout(() => setHighlightedId(null), 1500);
+    setRowOrder(prev => {
+      const without = prev.filter(id => id !== savedTask.id);
+      without.splice(insertIdx, 0, savedTask.id);
+      try { localStorage.setItem(storageKey, JSON.stringify(without)); } catch { /* ignore */ }
+      return without;
+    });
     onSaved();
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
+
+  // Insert a null ghost placeholder at the end when dragging over
+  const displayItems: (Task | null)[] = isDragOver
+    ? [...orderedVisible, null]
+    : orderedVisible;
 
   return (
     <>
@@ -528,8 +642,22 @@ export function GanttTimeline({
             {orderedVisible.length === 0 ? (
               <div style={{ padding: "24px 16px", color: "#94928D", fontSize: 12.5, textAlign: "center" }}>Sin tareas programadas</div>
             ) : (
-              orderedVisible.map(task => {
+              displayItems.map((task, di) => {
+                if (task === null) return (
+                  <div key="__ghost_left__" style={{
+                    height: ROW_H, display: "flex", alignItems: "center",
+                    padding: "0 12px 0 8px", gap: 8,
+                    background: "rgba(231,106,45,0.06)",
+                    borderTop: "2px dashed #E76A2D",
+                    borderBottom: "2px dashed #E76A2D",
+                    boxSizing: "border-box",
+                  }}>
+                    <div style={{ width: 18 }} /><div style={{ width: 18 }} />
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: "#E76A2D", opacity: 0.7 }}>Nueva tarea aquí</span>
+                  </div>
+                );
                 const isSel = selectedId === task.id;
+                void di;
                 const isHov = hoveredRowId === task.id;
                 const resp  = task.responsible_id ? responsibles.find(r => r.id === task.responsible_id) : null;
                 const isDraggingThis = rowDrag?.taskId === task.id;
@@ -538,7 +666,7 @@ export function GanttTimeline({
                     key={task.id}
                     onMouseEnter={() => setHoveredRowId(task.id)}
                     onMouseLeave={() => setHoveredRowId(null)}
-                    onClick={() => { setSelectedId(task.id); onEditTask(task); }}
+                    onClick={() => { if (rowDragMovedRef.current) return; setSelectedId(task.id); onEditTask(task); }}
                     style={{
                       height: ROW_H, display: "grid",
                       gridTemplateColumns: "18px 18px 1fr auto",
@@ -557,8 +685,26 @@ export function GanttTimeline({
                     {/* Grip */}
                     <GripHandle onPointerDown={(e) => startRowDrag(e, task.id)} />
 
-                    {/* Status dot */}
-                    <StatusDot status={task.status} />
+                    {/* Status dot — clickable if onStatusChange provided */}
+                    <button
+                      type="button"
+                      title="Cambiar estado"
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!onStatusChange) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setStatusDrop(d => d?.taskId === task.id ? null : { taskId: task.id, x: rect.left, y: rect.bottom + 6 });
+                      }}
+                      style={{
+                        background: "none", border: "none", padding: 0, margin: 0,
+                        cursor: onStatusChange ? "pointer" : "default",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        borderRadius: 99,
+                        outline: "none",
+                      }}
+                    >
+                      <StatusDotVisual status={task.status} />
+                    </button>
 
                     {/* Name + owner */}
                     <div style={{ minWidth: 0, lineHeight: 1.2 }}>
@@ -644,7 +790,7 @@ export function GanttTimeline({
                           textTransform: "uppercase",
                           color: isToday ? "rgba(255,255,255,0.85)" : "#94928D",
                         }}>
-                          {DAY_NAMES[d.getDay()]}
+                          {DAY_NAMES[d.getUTCDay()]}
                         </div>
                       )}
                       {/* Date number */}
@@ -656,7 +802,7 @@ export function GanttTimeline({
                         fontFamily: "'Plus Jakarta Sans',sans-serif",
                         color: isToday ? "#fff" : (we ? "#5B6770" : "#1A2329"),
                       }}>
-                        {d.getDate()}
+                        {d.getUTCDate()}
                       </div>
                     </div>
                   );
@@ -673,7 +819,7 @@ export function GanttTimeline({
                   position: "relative",
                   outline: isDragOver ? "2px solid #E76A2D" : "none",
                   outlineOffset: -2,
-                  minHeight: orderedVisible.length === 0 ? ROW_H * 3 : ROW_H * orderedVisible.length,
+                  minHeight: ROW_H * Math.max(3, displayItems.length),
                 }}
               >
                 {/* Weekend background columns */}
@@ -707,13 +853,23 @@ export function GanttTimeline({
                 {orderedVisible.length === 0 && (
                   <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>
                     <p style={{ fontSize: 12.5, color: "#94928D" }}>
-                      {isDragOver ? "Soltá acá para programar la tarea" : "Sin tareas programadas. Arrastrá tareas desde abajo para programarlas."}
+                      {"Sin tareas programadas. Arrastrá tareas desde abajo para programarlas."}
                     </p>
                   </div>
                 )}
 
                 {/* Task bar rows */}
-                {orderedVisible.map((task) => {
+                {displayItems.map((task, di) => {
+                  if (task === null) return (
+                    <div key="__ghost_right__" style={{
+                      height: ROW_H, position: "relative",
+                      background: "rgba(231,106,45,0.05)",
+                      borderTop: "2px dashed #E76A2D",
+                      borderBottom: "2px dashed #E76A2D",
+                      boxSizing: "border-box",
+                    }} />
+                  );
+                  void di;
                   const isThisDrag   = drag?.taskId   === task.id;
                   const isThisResize = resize?.taskId === task.id;
                   const isSel  = selectedId    === task.id;
@@ -729,15 +885,31 @@ export function GanttTimeline({
                   const { start, due } = getEffectiveDates(task, deltaDays, resizeEdge);
                   const hasBoth    = !!(start && due);
                   const startOff   = start ? dateToOffset(start) : null;
+
+                  // Clamp tooltip delta to effective date change so it stops at min/max
+                  let displayDelta = deltaDays;
+                  if (isThisResize && resize) {
+                    const origBase = resize.edge === "end"
+                      ? (task.due_date ?? task.start_date!)
+                      : (task.start_date ?? task.due_date!);
+                    const effectiveDate = resize.edge === "end" ? due : start;
+                    if (effectiveDate) displayDelta = dateToOffset(effectiveDate) - dateToOffset(origBase);
+                  }
                   const dueOff     = due   ? dateToOffset(due)   : null;
-                  const barLeftPx  = startOff !== null ? offsetToLeft(startOff) + 4 : (dueOff !== null ? offsetToLeft(dueOff) - 6 : 0);
-                  const barWidthPx = hasBoth ? Math.max(8, (dueOff! - startOff!) * dayW - 8) : 12;
+                  const halfDay = Math.floor(dayW / 2);
+                  const barLeftPx  = hasBoth
+                    ? offsetToLeft(startOff!) + 4
+                    : startOff !== null
+                      ? offsetToLeft(startOff) + 4          // start-only: left half
+                      : offsetToLeft(dueOff!) + halfDay;    // due-only: right half
+                  const barWidthPx = hasBoth
+                    ? Math.max(8, (dueOff! - startOff! + 1) * dayW - 8)
+                    : halfDay - 4;                          // half-day for single-date
 
                   const resp     = task.responsible_id ? responsibles.find(r => r.id === task.responsible_id) : null;
                   const initials = resp ? getInitials(resp.full_name) : null;
                   const avatarBg = resp ? avatarColor(resp.full_name) : "#94928D";
                   const isOverdue = task.status !== "completada" && task.status !== "cancelada" && !!task.due_date && task.due_date < TODAY_STR;
-                  const pct = task.estimated_progress ?? 0;
 
                   const barBoxShadow = isHL
                     ? "0 0 0 2px #E76A2D"
@@ -772,8 +944,10 @@ export function GanttTimeline({
                             style={{
                               position: "absolute", inset: 0,
                               borderRadius: 99,
-                              background: isOverdue ? "#FCE5E5" : st.bg,
-                              border: `1.5px solid ${isOverdue ? "#D03A3A" : st.border}`,
+                              background: isOverdue
+                                ? `repeating-linear-gradient(45deg,rgba(208,58,58,0.30) 0px,rgba(208,58,58,0.30) 4px,transparent 4px,transparent 8px),${st.bg}`
+                                : st.bg,
+                              border: `1.5px solid ${st.border}`,
                               boxShadow: barBoxShadow,
                               cursor: isThisDrag ? "grabbing" : "grab",
                               transform: isThisDrag ? "translateY(-1px)" : "none",
@@ -790,21 +964,8 @@ export function GanttTimeline({
                             <div style={{
                               position: "absolute", left: 0, top: 6, bottom: 6, width: 6,
                               borderRadius: 99,
-                              background: isOverdue ? "#D03A3A" : st.stripe,
+                              background: st.stripe,
                             }} />
-
-                            {/* Progress fill */}
-                            {hasBoth && pct > 0 && (
-                              <div style={{
-                                position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)",
-                                height: 4, borderRadius: 99,
-                                width: `${Math.min(pct, 100)}%`,
-                                maxWidth: "calc(100% - 36px)",
-                                background: isOverdue ? "#D03A3A" : st.stripe,
-                                opacity: 0.18,
-                                pointerEvents: "none",
-                              }} />
-                            )}
 
                             {/* Text content area — clipped */}
                             {hasBoth && barWidthPx > 40 && (
@@ -824,25 +985,30 @@ export function GanttTimeline({
                                   {task.title}
                                 </span>
                                 {/* Status badge */}
-                                {(isOverdue || st.badge) && barWidthPx > 90 && (
+                                {st.badge && barWidthPx > 90 && (
                                   <span style={{
                                     flexShrink: 0, fontSize: 10, fontWeight: 600,
                                     padding: "2px 7px", borderRadius: 99,
-                                    background: isOverdue ? "#D03A3A" : st.stripe,
+                                    background: st.stripe,
                                     color: "#fff", lineHeight: 1,
                                   }}>
-                                    {isOverdue ? "Vencida" : st.badge}
+                                    {st.badge}
                                   </span>
                                 )}
-                                {/* Progress % — only for pendiente/en_progreso with no badge, when there's room */}
-                                {!isOverdue && !st.badge && pct > 0 && barWidthPx > 130 && (
+                                {/* Vencida — siempre visible */}
+                                {isOverdue && (
                                   <span style={{
-                                    flexShrink: 0,
-                                    fontFamily: "'JetBrains Mono',monospace",
-                                    fontSize: 10, fontWeight: 500,
-                                    color: "#8E97A0", padding: "2px 6px", borderRadius: 99, background: "#F4F5F4",
+                                    flexShrink: 0, fontSize: 10, fontWeight: 700,
+                                    padding: barWidthPx > 90 ? "2px 6px" : "2px 5px",
+                                    borderRadius: 99,
+                                    border: "1.5px solid #D03A3A",
+                                    background: "#fff",
+                                    color: "#D03A3A",
+                                    lineHeight: 1,
+                                    display: "flex", alignItems: "center", gap: 3,
                                   }}>
-                                    {pct}%
+                                    <span style={{ fontSize: 9 }}>▲</span>
+                                    {barWidthPx > 90 && " Vencida"}
                                   </span>
                                 )}
                               </div>
@@ -882,7 +1048,7 @@ export function GanttTimeline({
                           </div>
 
                           {/* Delta tooltip */}
-                          {(isThisDrag || isThisResize) && deltaDays !== 0 && start && due && (
+                          {(isThisDrag || isThisResize) && deltaDays !== 0 && (start || due) && (
                             <div style={{
                               position: "absolute", top: -28, left: "50%", transform: "translateX(-50%)",
                               whiteSpace: "nowrap", background: "#1B1B1A", color: "#fff",
@@ -890,7 +1056,8 @@ export function GanttTimeline({
                               padding: "3px 10px", borderRadius: 99, pointerEvents: "none", zIndex: 20,
                               boxShadow: "0 4px 12px -2px rgba(0,0,0,0.22)",
                             }}>
-                              {deltaDays > 0 ? "+" : ""}{deltaDays}d · {fmtShort(start)} → {fmtShort(due)}
+                              {displayDelta > 0 ? "+" : ""}{displayDelta}d
+                              {start && due ? ` · ${fmtShort(start)} → ${fmtShort(due)}` : start ? ` · ${fmtShort(start)}` : ` · ${fmtShort(due!)}`}
                             </div>
                           )}
                         </div>
@@ -899,12 +1066,6 @@ export function GanttTimeline({
                   );
                 })}
 
-                {/* Drop zone */}
-                {isDragOver && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 0", borderTop: "2px dashed #E76A2D", background: "rgba(231,106,45,0.05)", zIndex: 10, position: "relative" }}>
-                    <p style={{ fontSize: 12.5, fontWeight: 600, color: "#E76A2D", margin: 0 }}>Soltá acá para programar la tarea</p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -920,10 +1081,32 @@ export function GanttTimeline({
               <span style={{ fontSize: 11.5, color: "#6B6A66" }}>{st.label}</span>
             </div>
           ))}
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Vencida — estado cruzado */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{
+              width: 22, height: 12, borderRadius: 99,
+              border: "1.5px solid #D03A3A",
+              overflow: "hidden", flexShrink: 0,
+              background: "repeating-linear-gradient(45deg,rgba(208,58,58,0.30) 0px,rgba(208,58,58,0.30) 4px,transparent 4px,transparent 8px),#FEF2F2",
+            }} />
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "#D03A3A", display: "flex", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: 9 }}>▲</span> Vencida
+            </span>
+          </div>
+          <button
+            title="Ir a hoy"
+            onClick={() => {
+              if (!scrollRef.current) return;
+              const todayCol = (-rangeStart) * dayWRef.current;
+              scrollRef.current.scrollTo({ left: Math.max(0, todayCol - scrollRef.current.clientWidth / 3), behavior: "smooth" });
+            }}
+            style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: "2px 6px", borderRadius: 6, cursor: "pointer", transition: "background 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(231,106,45,0.08)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
+          >
             <div style={{ width: 2, height: 14, borderRadius: 99, background: "#E76A2D" }} />
             <span style={{ fontSize: 11.5, color: "#E76A2D", fontWeight: 500, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Hoy</span>
-          </div>
+          </button>
           <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#94928D", fontSize: 11, marginLeft: 8 }}>
             {["Arrastrá", "Bordes", "Clic"].map(k => (
               <span key={k} style={{ padding: "1px 6px", borderRadius: 4, background: "#fff", border: "1px solid #ECE7DD", color: "#3A3936", fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5 }}>{k}</span>
@@ -954,6 +1137,104 @@ export function GanttTimeline({
           onSaved={handleScheduleSaved}
         />
       )}
+
+      {/* ── Status dropdown (fixed to escape overflow:hidden) ── */}
+      {statusDrop && onStatusChange && (() => {
+        const task = tasks.find(t => t.id === statusDrop.taskId);
+        if (!task) return null;
+        return (
+          <div
+            id="gantt-status-drop"
+            style={{
+              position: "fixed",
+              top: statusDrop.y,
+              left: statusDrop.x,
+              zIndex: 9999,
+              background: "#fff",
+              border: "1px solid #E6E7E5",
+              borderRadius: 10,
+              boxShadow: "0 8px 24px -4px rgba(15,22,28,0.14)",
+              padding: "4px",
+              minWidth: 148,
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+            }}
+          >
+            {STATUS_ORDER.map(s => {
+              const opt = STATUS_STYLE[s];
+              const active = task.status === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onMouseDown={e => {
+                    e.stopPropagation();
+                    setStatusDrop(null);
+                    if (!active) onStatusChange(task, s);
+                  }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 7,
+                    width: "100%", padding: "7px 10px", borderRadius: 7,
+                    fontSize: 12.5, fontWeight: active ? 700 : 500,
+                    background: active ? opt.bg : "transparent",
+                    color: active ? opt.border : "#3E4A52",
+                    border: "none", cursor: "pointer",
+                    textAlign: "left",
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "#F4F5F4"; }}
+                  onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                >
+                  <StatusDotVisual status={s} />
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ── Drag-over date tooltip ── */}
+      {dragOverInfo && (() => {
+        const d     = new Date(dragOverInfo.date + "T00:00:00Z");
+        const label = `${DAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]}`;
+        return (
+          <div style={{
+            position: "fixed",
+            top: dragOverInfo.clientY + 18,
+            left: dragOverInfo.clientX + 16,
+            zIndex: 9999,
+            background: "#1B2A34",
+            borderRadius: 10,
+            padding: "7px 13px",
+            pointerEvents: "none",
+            boxShadow: "0 6px 20px -4px rgba(0,0,0,0.4)",
+            whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}>
+            <div style={{
+              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+              background: "#FF6B35",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+                <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke="#fff" strokeWidth="1.5" fill="none"/>
+                <path d="M5 1.5v2M11 1.5v2M1.5 6h13" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.45)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Programar en
+              </span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
+                {label}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

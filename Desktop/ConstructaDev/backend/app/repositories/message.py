@@ -64,6 +64,22 @@ class MessageRepository(BaseRepository[Message]):
         )
         return result.scalar_one_or_none() is not None
 
+    async def has_recent_reminder_for_task(
+        self, task_id: int, responsible_id: int, since: datetime
+    ) -> bool:
+        """True if a reminder was already sent for this task+responsible after 'since'."""
+        result = await self.session.execute(
+            select(Message)
+            .where(
+                Message.task_id == task_id,
+                Message.responsible_id == responsible_id,
+                Message.direction == MessageDirection.OUTBOUND,
+                Message.created_at >= since,
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
     async def list_pending_processing(self) -> list[Message]:
         """Inbound messages that have not yet been processed by AI (Phase 3)."""
         result = await self.session.execute(

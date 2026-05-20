@@ -18,9 +18,11 @@ export interface Obra {
   actual_end_date: string | null;
   created_at: string;
   updated_at: string;
+  completed_tasks: number;
+  total_tasks: number;
 }
 
-export type Page = "panel" | "configuracion" | "equipo";
+export type Page = "panel" | "configuracion" | "equipo" | "bitacora" | "presupuestos";
 
 export type ObraTab = "resumen" | "tareas" | "responsables" | "alertas" | "historial";
 
@@ -37,7 +39,6 @@ export type TaskStatus =
   | "pendiente"
   | "en_progreso"
   | "bloqueada"
-  | "en_revision"
   | "completada"
   | "cancelada";
 
@@ -48,7 +49,6 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   responsible_id: number | null;
-  estimated_progress: number;
   start_date: string | null;
   start_time: string | null;
   due_date: string | null;
@@ -71,7 +71,7 @@ export interface HistorialEvento {
   created_at: string;
 }
 
-export type AlertType = "task_blocked" | "delay_risk" | "task_overdue" | "no_response";
+export type AlertType = "task_blocked" | "delay_risk" | "task_overdue" | "no_response" | "reschedule_requested";
 
 export interface Alert {
   id: number;
@@ -113,4 +113,5 @@ export interface CurrentUser {
   initials: string;
   color: string;
   role: "admin" | "collaborator";
+  avatar_url?: string | null;
 }

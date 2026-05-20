@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { login } from "../api/auth";
 import { setToken } from "../lib/tokenStorage";
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -57,12 +57,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         {/* Brand */}
         <div className="relative z-10 opacity-0 animate-fade-in" style={{ animationDelay: "0.05s" }}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded bg-constructa-primary flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9.5L12 4l9 5.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 21V12h6v9" />
-              </svg>
-            </div>
+            <img src="/logo.png" alt="Constructa" className="w-9 h-9 rounded flex-shrink-0 object-cover" />
             <span className="text-white font-display font-bold text-lg tracking-tight">CONSTRUCTA</span>
           </div>
         </div>
@@ -124,12 +119,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
           {/* Mobile logo */}
           <div className="flex items-center gap-2.5 mb-10 lg:hidden">
-            <div className="w-8 h-8 rounded bg-constructa-primary flex items-center justify-center">
-              <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9.5L12 4l9 5.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 21V12h6v9" />
-              </svg>
-            </div>
+            <img src="/logo.png" alt="Constructa" className="w-8 h-8 rounded object-cover" />
             <span className="font-display font-bold text-constructa-text tracking-tight">CONSTRUCTA</span>
           </div>
 
@@ -157,14 +147,14 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <label className="block font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-constructa-secondaryText mb-2">
                 Email
               </label>
-              <div className="relative flex items-center bg-white border border-constructa-border rounded-lg focus-within:border-constructa-primary focus-within:ring-2 focus-within:ring-constructa-primary/15 transition-all duration-200">
-                <Mail className="absolute left-3.5 w-4 h-4 text-constructa-border flex-shrink-0" />
+              <div className={`relative flex items-center bg-white border rounded-lg focus-within:ring-2 transition-all duration-200 ${error ? "border-red-400 focus-within:border-red-400 focus-within:ring-red-200" : "border-constructa-border focus-within:border-constructa-primary focus-within:ring-constructa-primary/15"}`}>
+                <EnvelopeIcon className="absolute left-3.5 w-4 h-4 text-constructa-border flex-shrink-0" />
                 <input
                   type="email"
                   autoComplete="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setError(null); }}
                   placeholder="manager@constructa.com"
                   className="w-full pl-10 pr-4 py-3 bg-transparent text-sm text-constructa-text placeholder-constructa-border focus:outline-none"
                 />
@@ -179,8 +169,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <label className="block font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-constructa-secondaryText mb-2">
                 Contraseña
               </label>
-              <div className="relative flex items-center bg-white border border-constructa-border rounded-lg focus-within:border-constructa-primary focus-within:ring-2 focus-within:ring-constructa-primary/15 transition-all duration-200">
-                <Lock className="absolute left-3.5 w-4 h-4 text-constructa-border flex-shrink-0" />
+              <div className={`relative flex items-center bg-white border rounded-lg focus-within:ring-2 transition-all duration-200 ${error ? "border-red-400 focus-within:border-red-400 focus-within:ring-red-200" : "border-constructa-border focus-within:border-constructa-primary focus-within:ring-constructa-primary/15"}`}>
+                <LockClosedIcon className="absolute left-3.5 w-4 h-4 text-constructa-border flex-shrink-0" />
                 <input
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
@@ -196,15 +186,28 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   className="absolute right-3.5 text-constructa-border hover:text-constructa-secondaryText transition-colors"
                   tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
             {/* Error */}
             {error && (
-              <div className="text-sm text-constructa-danger bg-red-50 border border-constructa-danger/25 rounded-lg px-4 py-3 animate-fade-in">
-                {error}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10,
+                background: "#FEF2F2",
+                border: "1px solid #FECACA",
+                borderRadius: 10,
+                padding: "12px 14px",
+                animation: "shake 0.35s ease",
+              }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ color: "#DC2626", flexShrink: 0 }}>
+                  <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                </svg>
+                <span style={{ fontSize: 13, color: "#B91C1C", fontWeight: 500 }}>
+                  {error}
+                </span>
               </div>
             )}
 
@@ -229,7 +232,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 ) : (
                   <>
                     Ingresar
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRightIcon className="w-4 h-4" />
                   </>
                 )}
               </button>

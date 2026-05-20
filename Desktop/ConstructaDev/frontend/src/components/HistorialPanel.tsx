@@ -4,13 +4,12 @@ import type { HistorialEvento, Task } from "../types/index";
 
 // ─── Badge types ──────────────────────────────────────────────────────────────
 
-type BadgeType = "new" | "completed" | "review" | "blocked" | "reschedule" | "progress" | "alert" | "updated" | "cancelled";
+type BadgeType = "new" | "completed" | "blocked" | "reschedule" | "progress" | "alert" | "updated" | "cancelled";
 type HistorialFilter = "todos" | "tareas" | "alertas" | "obra" | "sistema";
 
 const BADGE: Record<BadgeType, { label: string; dot: string; color: string; bg: string; border: string }> = {
   new:        { label: "Nueva tarea",    dot: "#8E97A0", color: "#5B6770", bg: "#F0F1EF", border: "#E0E3E1" },
   completed:  { label: "Completada",     dot: "#1F8A5B", color: "#136E47", bg: "#E4F3EC", border: "#BFE3CE" },
-  review:     { label: "En revisión",    dot: "#2A6FDB", color: "#1A4FA8", bg: "#E5EEFB", border: "#B3CEFA" },
   blocked:    { label: "Bloqueada",      dot: "#D03A3A", color: "#A82B2B", bg: "#FCE5E5", border: "#F0B0B0" },
   reschedule: { label: "Reprogramación", dot: "#2A6FDB", color: "#1A4FA8", bg: "#E5EEFB", border: "#B3CEFA" },
   progress:   { label: "En progreso",    dot: "#E85A26", color: "#C74018", bg: "#FFF1E9", border: "#FDBFA0" },
@@ -129,10 +128,6 @@ function buildRow(ev: HistorialEvento, tasks?: Task[]): RowData {
           sentence = <>{name} completó <strong>{taskTitle}</strong></>;
           badge = "completed";
           break;
-        case "en_revision":
-          sentence = <>{name} envió a revisión <strong>{taskTitle}</strong></>;
-          badge = "review";
-          break;
         case "bloqueada":
           sentence = (
             <>{name} bloqueó <strong>{taskTitle}</strong>
@@ -160,17 +155,36 @@ function buildRow(ev: HistorialEvento, tasks?: Task[]): RowData {
       const changes = ev.payload?.changes as Record<string, ChangeEntry> | undefined;
       if (changes) {
         const fields = Object.keys(changes);
-        if (fields.some(f => f === "due_date" || f === "start_date")) {
-          const field = fields.find(f => f === "due_date") ?? "start_date";
-          const entry = changes[field];
-          const from = entry.from_label != null ? String(entry.from_label) : fmtDate(entry.from);
-          const to   = entry.to_label   != null ? String(entry.to_label)   : fmtDate(entry.to);
-          sentence = (
-            <>{name} movió <strong>{taskTitle}</strong>{" "}
-              a <span style={{ color: "#8E97A0", textDecoration: "line-through" }}>{from}</span>
-              {" → "}<strong>{to}</strong>
-            </>
-          );
+        const hasDue   = fields.includes("due_date");
+        const hasStart = fields.includes("start_date");
+        if (hasDue || hasStart) {
+          if (hasDue && hasStart) {
+            const se = changes.start_date;
+            const de = changes.due_date;
+            const sf = se.from_label != null ? String(se.from_label) : fmtDate(se.from);
+            const st = se.to_label   != null ? String(se.to_label)   : fmtDate(se.to);
+            const df = de.from_label != null ? String(de.from_label) : fmtDate(de.from);
+            const dt = de.to_label   != null ? String(de.to_label)   : fmtDate(de.to);
+            sentence = (
+              <>{name} reprogramó las <strong>fechas</strong> de <strong>{taskTitle}</strong>{" · "}
+                Inicio: <span style={{ color: "#8E97A0", textDecoration: "line-through" }}>{sf}</span>{" → "}<strong>{st}</strong>
+                {" · "}
+                Fin: <span style={{ color: "#8E97A0", textDecoration: "line-through" }}>{df}</span>{" → "}<strong>{dt}</strong>
+              </>
+            );
+          } else {
+            const field     = hasDue ? "due_date" : "start_date";
+            const dateLabel = hasDue ? "fecha de fin" : "fecha de inicio";
+            const entry = changes[field];
+            const from = entry.from_label != null ? String(entry.from_label) : fmtDate(entry.from);
+            const to   = entry.to_label   != null ? String(entry.to_label)   : fmtDate(entry.to);
+            sentence = (
+              <>{name} reprogramó la <strong>{dateLabel}</strong> de <strong>{taskTitle}</strong>{" · "}
+                <span style={{ color: "#8E97A0", textDecoration: "line-through" }}>{from}</span>
+                {" → "}<strong>{to}</strong>
+              </>
+            );
+          }
           badge = "reschedule";
           break;
         }
@@ -178,16 +192,6 @@ function buildRow(ev: HistorialEvento, tasks?: Task[]): RowData {
           const entry = changes.responsible_id;
           const to = entry.to_label != null ? String(entry.to_label) : "Sin responsable";
           sentence = <>{name} asignó <strong>{taskTitle}</strong> a {to}</>;
-          badge = "updated";
-          break;
-        }
-        if (fields.length === 1 && fields[0] === "estimated_progress") {
-          const entry = changes.estimated_progress;
-          sentence = (
-            <>{name} actualizó el avance de <strong>{taskTitle}</strong>{" "}
-              a <strong>{String(entry.to ?? "")}%</strong>
-            </>
-          );
           badge = "updated";
           break;
         }
@@ -201,8 +205,8 @@ function buildRow(ev: HistorialEvento, tasks?: Task[]): RowData {
       const from = fmtDate(ev.payload?.from);
       const to   = fmtDate(ev.payload?.to);
       sentence = (
-        <>{name} movió <strong>{taskTitle}</strong>{" "}
-          a <span style={{ color: "#8E97A0", textDecoration: "line-through" }}>{from}</span>
+        <>{name} reprogramó la <strong>fecha de fin</strong> de <strong>{taskTitle}</strong>{" · "}
+          <span style={{ color: "#8E97A0", textDecoration: "line-through" }}>{from}</span>
           {" → "}<strong>{to}</strong>
         </>
       );
@@ -210,10 +214,34 @@ function buildRow(ev: HistorialEvento, tasks?: Task[]): RowData {
       break;
     }
 
-    case "alert_created":
-      sentence = <span style={{ color: "#8E97A0" }}>Sistema generó una alerta</span>;
+    case "alert_created": {
+      const ALERT_LABELS: Record<string, string> = {
+        delay_risk:            "Riesgo de demora",
+        task_blocked:          "Tarea bloqueada",
+        task_overdue:          "Tarea vencida",
+        no_response:           "Sin respuesta",
+        reschedule_requested:  "Demora informada",
+      };
+      const alertType  = String(ev.payload?.alert_type ?? "");
+      const alertLabel = ALERT_LABELS[alertType] ?? "alerta";
+      const hasTask    = !!ev.task_id;
+      sentence = hasTask
+        ? <span style={{ color: "#8E97A0" }}>Sistema detectó <strong style={{ color: "#C97D0E" }}>{alertLabel}</strong> en <strong style={{ color: "#1A2329" }}>{taskTitle}</strong></span>
+        : <span style={{ color: "#8E97A0" }}>Sistema detectó <strong style={{ color: "#C97D0E" }}>{alertLabel}</strong> en la obra</span>;
       badge = "alert";
       break;
+    }
+
+    case "reschedule_requested": {
+      const respName     = ev.payload?.responsible_name ? String(ev.payload.responsible_name) : name;
+      const suggestedRaw = ev.payload?.suggested_date   ? String(ev.payload.suggested_date)   : null;
+      const suggested    = suggestedRaw ? fmtDate(suggestedRaw) : "fecha sin especificar";
+      sentence = (
+        <><strong>{respName}</strong> sugirió nueva fecha de fin para <strong>{taskTitle}</strong>{": "}<strong>{suggested}</strong></>
+      );
+      badge = "reschedule";
+      break;
+    }
 
     case "obra_created":
       sentence = <>{name} creó la obra</>;

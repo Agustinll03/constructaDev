@@ -20,10 +20,11 @@ apiClient.interceptors.response.use(
   (err) => {
     const status = err.response?.status;
     const detail = err.response?.data?.detail;
+    const isLoginRequest = (err.config?.url ?? "").includes("/auth/login");
     const isUnauthenticated =
       status === 401 ||
       (status === 403 && detail === "Not authenticated");
-    if (isUnauthenticated) {
+    if (isUnauthenticated && !isLoginRequest) {
       clearToken();
       window.location.href = "/";
     }

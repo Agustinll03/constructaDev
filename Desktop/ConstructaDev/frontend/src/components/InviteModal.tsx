@@ -39,6 +39,7 @@ export function InviteModal({ onClose }: Props) {
   const [role, setRole]           = useState<UserRole>("collaborator");
   const [sending, setSending]     = useState(false);
   const [sent, setSent]           = useState(false);
+  const [sentEmail, setSentEmail] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [error, setError]         = useState<string | null>(null);
@@ -68,9 +69,11 @@ export function InviteModal({ onClose }: Props) {
     try {
       const res = await inviteMember(email.trim(), role);
       setInviteUrl(res.invite_url);
+      setSentEmail(email.trim());
       setSent(true);
       setEmail("");
-      setTimeout(() => setSent(false), 4000);
+      loadMembers();
+      setTimeout(() => setSent(false), 6000);
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
       const msg = typeof detail === "string"
@@ -152,9 +155,14 @@ export function InviteModal({ onClose }: Props) {
               </div>
 
               {sent ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: C.good50, border: `1px solid ${C.goodBorder}`, borderRadius: 10, fontSize: 13, color: C.good, fontWeight: 500 }}>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.5 3.5L13 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Invitación creada — copiá el link abajo.
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 14px", background: C.good50, border: `1px solid ${C.goodBorder}`, borderRadius: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: C.good, fontWeight: 600 }}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.5 3.5L13 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Email enviado a {sentEmail}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#136E47", lineHeight: 1.4 }}>
+                    El invitado recibirá un email con el link para crear su cuenta. El link expira en 72 horas.
+                  </div>
                 </div>
               ) : (
                 <>
@@ -288,25 +296,30 @@ export function InviteModal({ onClose }: Props) {
           </div>
         </div>
 
-        {/* Footer: copy invite link */}
+        {/* Footer: copy invite link (fallback) */}
         {inviteUrl && (
-          <div style={{ padding: "14px 22px", borderTop: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 12 }}>
-            <span style={{ fontSize: 12, color: C.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>
-              {inviteUrl}
-            </span>
-            <button
-              onClick={handleCopyLink}
-              style={{
-                flexShrink: 0, height: 32, padding: "0 14px", borderRadius: 8,
-                border: `1px solid ${linkCopied ? C.goodBorder : C.line}`,
-                background: linkCopied ? C.good50 : C.bg,
-                color: linkCopied ? C.good : C.text2,
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
-                transition: ".15s", fontFamily: "'Plus Jakarta Sans', sans-serif",
-              }}
-            >
-              {linkCopied ? "¡Copiado!" : "Copiar link"}
-            </button>
+          <div style={{ padding: "12px 22px", borderTop: `1px solid ${C.line}`, flexShrink: 0 }}>
+            <div style={{ fontSize: 11, color: C.text3, marginBottom: 6, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>
+              Link de respaldo
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 11.5, color: C.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, background: C.bg, padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.line}` }}>
+                {inviteUrl}
+              </span>
+              <button
+                onClick={handleCopyLink}
+                style={{
+                  flexShrink: 0, height: 30, padding: "0 12px", borderRadius: 7,
+                  border: `1px solid ${linkCopied ? C.goodBorder : C.line}`,
+                  background: linkCopied ? C.good50 : C.bg,
+                  color: linkCopied ? C.good : C.text2,
+                  fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  transition: ".15s", fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
+                {linkCopied ? "¡Copiado!" : "Copiar"}
+              </button>
+            </div>
           </div>
         )}
       </div>

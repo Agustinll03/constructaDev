@@ -1,10 +1,13 @@
+import { UserCircleIcon, UserPlusIcon, ArrowRightStartOnRectangleIcon } from "@heroicons/react/24/outline";
 import type React from "react";
 import type { ReactNode } from "react";
 import { useRef, useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { useUser, ROLE_LABELS, ROLE_COLORS } from "../../context/UserContext";
 import { useOnlineUsers } from "../../hooks/useOnlineUsers";
+import { UserAvatarTooltip } from "../ui/UserAvatarTooltip";
 import { InviteModal } from "../InviteModal";
+import { UserProfileModal } from "../UserProfileModal";
 import type { Obra, ObraTab, Page } from "../../types";
 
 interface AppLayoutProps {
@@ -15,7 +18,7 @@ interface AppLayoutProps {
   onNavigate: (page: Page) => void;
   onLogout: () => void;
   pinnedObras?: Obra[];
-  currentUser?: { name: string; email: string; initials: string; color: string };
+  currentUser?: { name: string; email: string; initials: string; color: string; avatar_url?: string | null };
   selectedObra?: Obra | null;
   activeTab?: ObraTab;
   onTabChange?: (tab: ObraTab) => void;
@@ -40,6 +43,7 @@ export function AppLayout({
   const onlineUsers = useOnlineUsers();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showInvite, setShowInvite]     = useState(false);
+  const [showProfile, setShowProfile]   = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const avatarRef   = useRef<HTMLDivElement>(null);
 
@@ -107,87 +111,59 @@ export function AppLayout({
             )}
           </div>
 
-          {/* Search */}
-          <div style={{ flex: 1, maxWidth: 480, display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid #E6E7E5", borderRadius: 10, padding: "8px 12px", fontSize: 13, color: "#8E97A0", cursor: "text", transition: "border-color 0.15s, box-shadow 0.15s" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#C9D0D5"; (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#E6E7E5"; (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.55 }}>
-              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span style={{ flex: 1, userSelect: "none" }}>Buscar obras, tareas, documentos…</span>
-            <kbd style={{ fontSize: 10.5, padding: "2px 6px", borderRadius: 5, background: "#F4F5F4", border: "1px solid #E0E3E1", color: "#8E97A0", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>⌘K</kbd>
-          </div>
-
           {/* Right actions */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
 
-            {/* Refresh */}
-            <button title="Refrescar" style={{ width: 34, height: 34, borderRadius: 9, background: "#fff", border: "1px solid #E6E7E5", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#6B767E", cursor: "pointer", transition: "background 0.12s, color 0.12s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F4F5F4"; (e.currentTarget as HTMLElement).style.color = "#3D4A52"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#6B767E"; }}
-            >
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <path d="M13.5 8A5.5 5.5 0 112.5 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M2.5 2.5v3h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-
-            {/* Bell */}
-            <button title="Notificaciones" style={{ width: 34, height: 34, borderRadius: 9, background: "#fff", border: "1px solid #E6E7E5", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#6B767E", cursor: "pointer", position: "relative", transition: "background 0.12s, color 0.12s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F4F5F4"; (e.currentTarget as HTMLElement).style.color = "#3D4A52"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#6B767E"; }}
-            >
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <path d="M3 12V8a5 5 0 0110 0v4M2 12h12M6 14a2 2 0 004 0" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
-              </svg>
-              <span style={{ position: "absolute", top: 7, right: 7, width: 7, height: 7, borderRadius: 99, background: "#FF6B35", boxShadow: "0 0 0 2px #F4F5F4" }} />
-            </button>
-
             {/* Online team avatars */}
             {onlineUsers.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 0, marginRight: 2 }}>
-                {onlineUsers.slice(0, 3).map((u, i) => (
-                  <div
-                    key={u.id}
-                    title={`${u.name} · en línea`}
-                    style={{
-                      width: 26, height: 26, borderRadius: 99,
-                      background: u.color, color: "#fff",
-                      fontWeight: 700, fontSize: 9.5,
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: "#fff", border: "1px solid #E6E7E5",
+                borderRadius: 99, padding: "4px 10px 4px 6px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  {onlineUsers.slice(0, 3).map((u, i) => (
+                    <UserAvatarTooltip
+                      key={u.id}
+                      user={u}
+                      wrapperStyle={{ marginLeft: i > 0 ? -7 : 0, zIndex: 3 - i, flexShrink: 0 }}
+                    >
+                      <div style={{
+                        width: 24, height: 24, borderRadius: 99,
+                        background: u.color, color: "#fff",
+                        fontWeight: 700, fontSize: 9,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        border: "2px solid #fff",
+                        cursor: "default",
+                        position: "relative",
+                      }}>
+                        {u.initials}
+                        <span style={{
+                          position: "absolute", bottom: 0, right: 0,
+                          width: 6, height: 6, borderRadius: 99,
+                          background: "#1F8A5B",
+                          border: "1.5px solid #fff",
+                        }} />
+                      </div>
+                    </UserAvatarTooltip>
+                  ))}
+                  {onlineUsers.length > 3 && (
+                    <div style={{
+                      width: 24, height: 24, borderRadius: 99,
+                      background: "#F4F5F4", color: "#5B6770",
+                      fontWeight: 600, fontSize: 9,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      border: "2px solid rgba(244,245,244,0.85)",
-                      marginLeft: i > 0 ? -7 : 0,
-                      zIndex: 3 - i,
-                      position: "relative",
-                      flexShrink: 0,
-                      cursor: "default",
-                    }}
-                  >
-                    {u.initials}
-                    {/* Green online dot */}
-                    <span style={{
-                      position: "absolute", bottom: 0, right: 0,
-                      width: 7, height: 7, borderRadius: 99,
-                      background: "#1F8A5B",
-                      border: "1.5px solid rgba(244,245,244,0.85)",
-                    }} />
-                  </div>
-                ))}
-                {onlineUsers.length > 3 && (
-                  <div style={{
-                    width: 26, height: 26, borderRadius: 99,
-                    background: "#F4F5F4", color: "#5B6770",
-                    fontWeight: 600, fontSize: 9.5,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    border: "2px solid rgba(244,245,244,0.85)",
-                    marginLeft: -7, zIndex: 0, flexShrink: 0,
-                  }}>
-                    +{onlineUsers.length - 3}
-                  </div>
-                )}
+                      border: "2px solid #fff",
+                      marginLeft: -7, zIndex: 0, flexShrink: 0,
+                    }}>
+                      +{onlineUsers.length - 3}
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize: 11, color: "#8E97A0", fontWeight: 500, whiteSpace: "nowrap" }}>
+                  {onlineUsers.length === 1 ? "1 en línea" : `${onlineUsers.length} en línea`}
+                </span>
               </div>
             )}
 
@@ -199,18 +175,21 @@ export function AppLayout({
                 title={`${displayUser.name} · ${ROLE_LABELS[role]}`}
                 style={{
                   width: 32, height: 32, borderRadius: 99, flexShrink: 0,
-                  background: avatarColor, color: "#fff",
-                  fontWeight: 700, fontSize: 11,
+                  background: displayUser.avatar_url ? "transparent" : avatarColor,
+                  color: "#fff", fontWeight: 700, fontSize: 11,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  cursor: "pointer", userSelect: "none",
+                  cursor: "pointer", userSelect: "none", overflow: "hidden",
                   boxShadow: dropdownOpen
                     ? "0 0 0 2px #fff, 0 0 0 3px #FF6B35"
                     : "0 0 0 2px #fff, 0 0 0 3px #E6E7E5",
                   transition: "box-shadow 0.15s",
                 }}
               >
-                {userInitials}
+                {displayUser.avatar_url
+                  ? <img src={displayUser.avatar_url} alt={userInitials} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : userInitials
+                }
               </div>
 
               {dropdownOpen && (
@@ -226,8 +205,10 @@ export function AppLayout({
                 >
                   {/* User info */}
                   <div style={{ padding: "12px 10px", borderBottom: "1px solid #E6E7E5", marginBottom: 4, display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 99, background: avatarColor, color: "#fff", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif", flexShrink: 0 }}>
-                      {userInitials}
+                    <div style={{ width: 38, height: 38, borderRadius: 99, background: displayUser.avatar_url ? "transparent" : avatarColor, color: "#fff", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif", flexShrink: 0, overflow: "hidden" }}>
+                      {displayUser.avatar_url
+                        ? <img src={displayUser.avatar_url} alt={userInitials} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : userInitials}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {!displayUser.name.includes("@") && (
@@ -246,16 +227,23 @@ export function AppLayout({
 
                   <div style={{ height: 1, background: "#E6E7E5", margin: "4px 0" }} />
 
+                  {/* Mi perfil */}
+                  <DropdownItem
+                    icon={<UserCircleIcon style={{ width: 14, height: 14 }} />}
+                    label="Mi perfil"
+                    onClick={() => { setDropdownOpen(false); setShowProfile(true); }}
+                  />
+
                   {/* Invite members */}
                   <DropdownItem
-                    icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.4"/><path d="M1.5 13c0-2.485 2.015-4.5 4.5-4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M11 9v4M9 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+                    icon={<UserPlusIcon style={{ width: 14, height: 14 }} />}
                     label="Invitar miembros"
                     onClick={() => { setDropdownOpen(false); setShowInvite(true); }}
                   />
 
                   {/* Logout */}
                   <DropdownItem
-                    icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 3H3a1 1 0 00-1 1v8a1 1 0 001 1h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M10.5 11l3-3-3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M13.5 8H6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+                    icon={<ArrowRightStartOnRectangleIcon style={{ width: 14, height: 14 }} />}
                     label="Cerrar sesión"
                     danger
                     onClick={() => { setDropdownOpen(false); onLogout(); }}
@@ -271,7 +259,8 @@ export function AppLayout({
         </main>
       </div>
 
-      {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
+      {showInvite   && <InviteModal       onClose={() => setShowInvite(false)} />}
+      {showProfile  && <UserProfileModal  onClose={() => setShowProfile(false)} />}
     </div>
   );
 }

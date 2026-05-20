@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, Plus, Search, Pin } from "lucide-react";
+import { PlusIcon, MagnifyingGlassIcon, MapPinIcon } from "@heroicons/react/24/outline";
 import { fetchObras } from "../api/obras";
 import { fetchMembers, type ApiUser } from "../api/users";
 import { userAvatarColor } from "../context/UserContext";
@@ -35,14 +35,6 @@ const PROGRESS_COLOR: Record<ObraStatus, string> = {
   cancelada:   "#B0B4B0",
 };
 
-const STATUS_PCT: Record<ObraStatus, number> = {
-  planificada: 5,
-  en_progreso: 50,
-  pausada:     30,
-  completada:  100,
-  cancelada:   0,
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysRemaining(endDate: string | null): number | null {
@@ -63,7 +55,7 @@ function getInitials(name: string): string {
 function ObraCard({ obra, onSelect, isPinned, onTogglePin, members }: { obra: Obra; onSelect: () => void; isPinned: boolean; onTogglePin: () => void; members: Map<number, ApiUser> }) {
   const [imgError, setImgError] = useState(false);
   const pill      = STATUS_PILL[obra.status];
-  const pct       = STATUS_PCT[obra.status];
+  const pct       = obra.total_tasks === 0 ? 0 : Math.round((obra.completed_tasks / obra.total_tasks) * 100);
   const barColor  = PROGRESS_COLOR[obra.status];
   const days      = daysRemaining(obra.expected_end_date);
   const nameAbbr  = obra.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
@@ -151,7 +143,7 @@ function ObraCard({ obra, onSelect, isPinned, onTogglePin, members }: { obra: Ob
           onMouseEnter={e => { if (!isPinned) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.50)"; }}
           onMouseLeave={e => { if (!isPinned) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.30)"; }}
         >
-          <Pin style={{ width: 12, height: 12 }} />
+          <MapPinIcon style={{ width: 12, height: 12 }} />
         </button>
 
         {/* Status pill */}
@@ -270,10 +262,10 @@ interface KpiCardProps {
 
 function KpiCard({ label, value, icon, iconBg, iconColor, delta, sparkColor, sparkPath }: KpiCardProps) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #E6E7E5", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+    <div style={{ background: "#fff", border: "1px solid #ECEEED", borderRadius: 16, padding: "18px 20px", position: "relative", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>{label}</span>
-        <div style={{ width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: iconBg, color: iconColor }}>
+        <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#A0ABB4" }}>{label}</span>
+        <div style={{ width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: iconBg, color: iconColor }}>
           {icon}
         </div>
       </div>
@@ -284,7 +276,7 @@ function KpiCard({ label, value, icon, iconBg, iconColor, delta, sparkColor, spa
         {delta}
       </div>
       {/* Sparkline */}
-      <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 36, opacity: 0.45 }} viewBox="0 0 200 40" preserveAspectRatio="none">
+      <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 36, opacity: 0.4 }} viewBox="0 0 200 40" preserveAspectRatio="none">
         <path d={sparkPath} stroke={sparkColor} strokeWidth="1.8" fill="none"/>
       </svg>
     </div>
@@ -367,7 +359,7 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* Search */}
           <div style={{ position: "relative" }}>
-            <Search style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, color: "#8E97A0", pointerEvents: "none" }} />
+            <MagnifyingGlassIcon style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, color: "#8E97A0", pointerEvents: "none" }} />
             <input
               type="text"
               placeholder="Buscar obras…"
@@ -398,16 +390,6 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
             )}
           </div>
 
-          {/* Refresh */}
-          <button
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-            title="Actualizar"
-            style={{ width: 36, height: 36, borderRadius: 10, background: "#fff", border: "1px solid #E6E7E5", display: "flex", alignItems: "center", justifyContent: "center", color: "#5B6770", cursor: "pointer", opacity: refreshing ? 0.5 : 1 }}
-          >
-            <RefreshCw style={{ width: 13, height: 13, animation: refreshing ? "spin 1s linear infinite" : "none" }} />
-          </button>
-
           {/* Nueva obra */}
           {canCreateObra && (
             <button
@@ -416,7 +398,7 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
               onMouseEnter={e => (e.currentTarget.style.background = "#E85A26")}
               onMouseLeave={e => (e.currentTarget.style.background = "#FF6B35")}
             >
-              <Plus style={{ width: 13, height: 13 }} />
+              <PlusIcon style={{ width: 13, height: 13 }} />
               Nueva obra
             </button>
           )}
@@ -491,7 +473,7 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
                   onClick={onNewObra}
                   style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, background: "#FF6B35", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 6px 14px -6px rgba(255,107,53,0.55)" }}
                 >
-                  <Plus style={{ width: 13, height: 13 }} />
+                  <PlusIcon style={{ width: 13, height: 13 }} />
                   Crear primera obra
                 </button>
               )}
@@ -590,7 +572,7 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
                     >
                       <div>
                         <div style={{ width: 44, height: 44, borderRadius: 99, background: "rgba(255,107,53,0.10)", color: "#FF6B35", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                          <Plus style={{ width: 18, height: 18 }} />
+                          <PlusIcon style={{ width: 18, height: 18 }} />
                         </div>
                         <h4 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 15, margin: "0 0 4px", color: "#1A2329" }}>Crear nueva obra</h4>
                         <p style={{ margin: 0, fontSize: 12, color: "#8E97A0", maxWidth: 200 }}>Empezá un proyecto desde cero.</p>

@@ -7,6 +7,7 @@ import type { Responsible, Task } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+
 const inputCls = (err = false) =>
   [
     "w-full border rounded px-3 py-2.5 text-sm text-constructa-text bg-white",
@@ -14,6 +15,41 @@ const inputCls = (err = false) =>
     "focus:outline-none focus:ring-2 focus:ring-constructa-primary focus:border-constructa-primary transition",
     err ? "border-constructa-danger" : "border-constructa-border",
   ].join(" ");
+
+const BASE_SELECT: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "9px 12px",
+  fontSize: 13,
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  color: "#1A2329",
+  background: "#fff",
+  border: "1px solid #E6E7E5",
+  borderRadius: 10,
+  outline: "none",
+  transition: "border-color 0.15s, box-shadow 0.15s",
+  appearance: "none",
+  cursor: "pointer",
+};
+
+function selectStyle(err = false): React.CSSProperties {
+  return {
+    ...BASE_SELECT,
+    borderColor: err ? "#D03A3A" : "#E6E7E5",
+    boxShadow: err ? "0 0 0 3px rgba(208,58,58,0.08)" : "none",
+  };
+}
+
+function onFocusSelect(e: React.FocusEvent<HTMLSelectElement>, err = false) {
+  if (err) return;
+  e.currentTarget.style.borderColor = "#FF6B35";
+  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(255,107,53,0.10)";
+}
+
+function onBlurSelect(e: React.FocusEvent<HTMLSelectElement>, err = false) {
+  e.currentTarget.style.borderColor = err ? "#D03A3A" : "#E6E7E5";
+  e.currentTarget.style.boxShadow = err ? "0 0 0 3px rgba(208,58,58,0.08)" : "none";
+}
 
 function Label({
   children,
@@ -189,11 +225,13 @@ export function SchedulingModal({
             ) : (
               <>
                 <select
-                  className={[inputCls(!!errors.responsibleId), "cursor-pointer"].join(" ")}
+                  style={selectStyle(!!errors.responsibleId)}
                   value={responsibleId}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                     setResponsibleId(e.target.value)
                   }
+                  onFocus={ev => onFocusSelect(ev, !!errors.responsibleId)}
+                  onBlur={ev => onBlurSelect(ev, !!errors.responsibleId)}
                 >
                   <option value="">Seleccioná un responsable</option>
                   {activeResponsibles.map((r) => (

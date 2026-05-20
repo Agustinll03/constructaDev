@@ -7,8 +7,6 @@ import type { Task } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const TODAY = new Date().toISOString().slice(0, 10);
-
 function fmtDate(d: string | null): string {
   if (!d) return "—";
   const [y, m, day] = d.split("-");
@@ -56,15 +54,13 @@ export function ReschedulingModal({
     : mode === "resize-end" ? "Ajustar vencimiento de tarea"
     : "Reprogramar tarea";
 
-  const willBeOverdue = newDueDate && newDueDate < TODAY;
-
   async function handleConfirm() {
     setSaving(true);
     setApiError(null);
     try {
       const payload: TaskUpdatePayload = {};
-      if (task.start_date !== null && newStartDate !== null) payload.start_date = newStartDate;
-      if (task.due_date   !== null && newDueDate   !== null) payload.due_date   = newDueDate;
+      if (newStartDate !== null) payload.start_date = newStartDate;
+      if (newDueDate   !== null) payload.due_date   = newDueDate;
       const saved = await updateTask(task.id, payload);
       onSaved(saved);
     } catch (err) {
@@ -160,16 +156,6 @@ export function ReschedulingModal({
                 </span>
               </div>
             )
-          )}
-
-          {/* Overdue warning */}
-          {willBeOverdue && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-constructa-warning/50 rounded px-3 py-2.5">
-              <AlertTriangle className="w-4 h-4 text-constructa-warning flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-800">
-                La nueva fecha de vencimiento queda en el pasado. La tarea quedará marcada como vencida.
-              </p>
-            </div>
           )}
 
           {/* Nearby tasks impact */}

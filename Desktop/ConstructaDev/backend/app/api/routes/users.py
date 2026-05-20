@@ -3,9 +3,11 @@ from fastapi import APIRouter, HTTPException
 from app.core.config import settings
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.core.exceptions import ConflictError
+from app.core.security import hash_password, verify_password
 from app.repositories.user import UserRepository
-from app.schemas.user import InviteRequest, InviteResponse, UserRead
+from app.schemas.user import ChangePasswordRequest, InviteRequest, InviteResponse, UpdateProfileRequest, UserRead
 from app.services.auth_service import AuthService
+from app.services.email_service import send_invite_email
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -13,6 +15,25 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/me", response_model=UserRead)
 async def me(current_user: CurrentUser):
     return current_user
+
+
+@router.patch("/me", response_model=UserRead)
+async def update_profile(data: UpdateProfileRequest, current_user: CurrentUser, db: DbSession):
+    fields = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not fields:
+        return current_user
+    updated = await UserRepository(db).update_fields(current_user.id, **fields)
+    return updated
+
+
+@router.post("/me/password", status_code=204)
+async def change_password(data: ChangePasswordRequest, current_user: CurrentUser, db: DbSession):
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+    await UserRepository(db).update_fields(
+        current_user.id,
+        hashed_password=hash_password(data.new_password),
+    )
 
 
 @router.get("", response_model=list[UserRead])
@@ -27,6 +48,7 @@ async def invite_member(data: InviteRequest, current_user: AdminUser, db: DbSess
     except ConflictError as e:
         raise HTTPException(status_code=409, detail=str(e))
     invite_url = f"{settings.FRONTEND_URL}/invite/{token}"
+    await send_invite_email(data.email, invite_url, data.role)
     return InviteResponse(invite_token=token, invite_url=invite_url)
 
 

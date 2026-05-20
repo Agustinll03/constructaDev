@@ -10,6 +10,7 @@ from app.core.database import Base
 
 class ConversationStep(str, enum.Enum):
     IDLE = "idle"
+    OBRA_SELECT = "obra_select"
     TASK_SELECT = "task_select"
     STATUS_MENU = "status_menu"
     AWAIT_DATE = "await_date"

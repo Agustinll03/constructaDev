@@ -7,17 +7,13 @@ const socket = io("http://localhost:8000", {
   },
   autoConnect: false,
   reconnection: true,
-  reconnectionAttempts: 10,
+  reconnectionAttempts: Infinity,
   reconnectionDelay: 1_000,
-  transports: ["websocket", "polling"],
+  reconnectionDelayMax: 10_000,
+  // Start with polling (always works), then upgrade to websocket.
+  // Reversing the order causes the first attempt to fail and adds a 1s reconnect delay.
+  transports: ["polling", "websocket"],
 });
 
-if (import.meta.env.DEV) {
-  socket.on("connect", () => console.log("[socket] connected sid=", socket.id));
-  socket.on("disconnect", (reason) => console.log("[socket] disconnected reason=", reason));
-  socket.on("connect_error", (err) => console.error("[socket] connect_error", err.message));
-  socket.on("online_users", (d) => console.log("[socket] online_users", d));
-  socket.on("presence_update", (d) => console.log("[socket] presence_update", d));
-}
 
 export default socket;

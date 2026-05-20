@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { GanttTimeline } from "./GanttTimeline";
 import { HistorialPanel } from "./HistorialPanel";
-import type { Alert, HistorialEvento, Responsible, Task } from "../types";
+import type { Alert, HistorialEvento, Responsible, Task, TaskStatus } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +69,7 @@ interface ResumenTabProps {
   onViewHistorial?: () => void;
   onEditTask: (task: Task) => void;
   onTaskRescheduled: () => void;
+  onStatusChange?: (task: Task, newStatus: TaskStatus) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -86,6 +87,7 @@ export function ResumenTab({
   onViewHistorial,
   onEditTask,
   onTaskRescheduled,
+  onStatusChange,
 }: ResumenTabProps) {
   const [draggingId, setDraggingId] = useState<number | null>(null);
 
@@ -95,9 +97,10 @@ export function ResumenTab({
   const completedCount = tasks.filter((t) => t.status === "completada").length;
   const unreadAlerts   = alerts.filter((a) => !a.is_read);
   const unreadCount    = unreadAlerts.length;
-  const avgProgress    = total === 0
+  const nonCancelled = tasks.filter((t) => t.status !== "cancelada");
+  const avgProgress  = nonCancelled.length === 0
     ? 0
-    : Math.round(tasks.reduce((s, t) => s + t.estimated_progress, 0) / total);
+    : Math.round((completedCount / nonCancelled.length) * 100);
 
   const tasksWithoutDates = tasks.filter((t) => !t.start_date && !t.due_date);
 
@@ -127,7 +130,6 @@ export function ResumenTab({
   const statusDist = total === 0 ? null : {
     completada:  tasks.filter(t => t.status === "completada").length  / total * 100,
     en_progreso: tasks.filter(t => t.status === "en_progreso").length / total * 100,
-    en_revision: tasks.filter(t => t.status === "en_revision").length / total * 100,
     pendiente:   tasks.filter(t => t.status === "pendiente").length   / total * 100,
     bloqueada:   tasks.filter(t => t.status === "bloqueada").length   / total * 100,
   };
@@ -139,15 +141,29 @@ export function ResumenTab({
 
   const kpiTileStyle: CSSProperties = {
     background: "#fff",
-    border: "1px solid #E6E7E5",
-    borderRadius: 14,
-    padding: "16px 18px",
+    border: "1px solid #ECEEED",
+    borderRadius: 16,
+    padding: "18px 20px",
     display: "flex",
     flexDirection: "column",
-    gap: 10,
+    gap: 12,
     position: "relative",
     overflow: "hidden",
   };
+
+  const kpiLabelStyle: CSSProperties = {
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: 11, fontWeight: 600,
+    letterSpacing: "0.06em", textTransform: "uppercase" as const,
+    color: "#A0ABB4",
+  };
+
+  const kpiIconStyle = (bg: string, color: string): CSSProperties => ({
+    width: 32, height: 32, borderRadius: 10,
+    background: bg, color,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0,
+  });
 
   return (
     <div className="space-y-5">
@@ -168,8 +184,8 @@ export function ResumenTab({
         {/* ── KPI 1: Avance general (hero) ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Avance general</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FFF1E9", color: "#FF6B35", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Avance general</span>
+            <div style={kpiIconStyle("#FFF1E9", "#FF6B35")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8h3l2-5 3 10 2-5 4-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
           </div>
@@ -185,9 +201,8 @@ export function ResumenTab({
           {statusDist && (
             <div style={{ display: "flex", height: 6, borderRadius: 99, overflow: "hidden", background: "#F0F1EF" }} title="Distribución por estado">
               {statusDist.completada  > 0 && <span style={{ background: "#1F8A5B", width: statusDist.completada  + "%" }} />}
-              {statusDist.en_progreso > 0 && <span style={{ background: "#E85A26", width: statusDist.en_progreso + "%" }} />}
-              {statusDist.en_revision > 0 && <span style={{ background: "#2A6FDB", width: statusDist.en_revision + "%" }} />}
-              {statusDist.pendiente   > 0 && <span style={{ background: "#E89B14", width: statusDist.pendiente   + "%" }} />}
+              {statusDist.en_progreso > 0 && <span style={{ background: "#D97706", width: statusDist.en_progreso + "%" }} />}
+              {statusDist.pendiente   > 0 && <span style={{ background: "#3B82F6", width: statusDist.pendiente   + "%" }} />}
               {statusDist.bloqueada   > 0 && <span style={{ background: "#D03A3A", width: statusDist.bloqueada   + "%" }} />}
             </div>
           )}
@@ -196,8 +211,8 @@ export function ResumenTab({
         {/* ── KPI 2: Tareas activas ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Tareas activas</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#E5EEFB", color: "#2A6FDB", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Tareas activas</span>
+            <div style={kpiIconStyle("#E5EEFB", "#2A6FDB")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 4.5V8l2.4 1.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/></svg>
             </div>
           </div>
@@ -210,8 +225,8 @@ export function ResumenTab({
         {/* ── KPI 3: Completadas ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Completadas</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#E4F3EC", color: "#1F8A5B", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Completadas</span>
+            <div style={kpiIconStyle("#E4F3EC", "#1F8A5B")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M5 8.2l2 2 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
             </div>
           </div>
@@ -224,8 +239,8 @@ export function ResumenTab({
         {/* ── KPI 4: Alertas activas ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Alertas activas</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FDF1DE", color: "#C97D0E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Alertas activas</span>
+            <div style={kpiIconStyle("#FDF1DE", "#C97D0E")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2.5L14 13H2L8 2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/><path d="M8 6.5V9.5M8 11.4v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
             </div>
           </div>
@@ -244,8 +259,8 @@ export function ResumenTab({
         {/* ── KPI 5: Tareas críticas ── */}
         <div style={kpiTileStyle}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8E97A0" }}>Críticas</span>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FCE5E5", color: "#D03A3A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={kpiLabelStyle}>Críticas</span>
+            <div style={kpiIconStyle("#FCE5E5", "#D03A3A")}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 14c2.5 0 4.5-1.7 4.5-4.4 0-2-1.6-2.9-2.5-3.6.5-2 0-3.5-2-4 .5 2.5-2 4-3.7 5.4-.8.7-1.3 1.6-1.3 2.7C3 12.4 5.4 14 8 14z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none"/></svg>
             </div>
           </div>
@@ -271,6 +286,7 @@ export function ResumenTab({
           obraExpectedEndDate={obraExpectedEndDate}
           onSaved={onTaskRescheduled}
           onEditTask={onEditTask}
+          onStatusChange={onStatusChange}
           tasksWithoutDates={tasksWithoutDates.length}
         />
       </section>
@@ -345,10 +361,9 @@ export function ResumenTab({
               <ol style={{ margin: 0, padding: "0 20px", listStyle: "none" }}>
                 {tasksWithoutDates.slice(0, 5).map((t, i) => {
                   const STATUS_STYLE: Record<string, { label: string; dot: string; color: string; bg: string; border: string; avatarBg: string }> = {
-                    pendiente:   { label: "Pendiente",   dot: "#E89B14", color: "#9A5D08", bg: "#FDF1DE", border: "#F0D5A0", avatarBg: "#E89B14" },
-                    en_progreso: { label: "En progreso", dot: "#E85A26", color: "#C74018", bg: "#FFF1E9", border: "#FDBFA0", avatarBg: "#E85A26" },
+                    pendiente:   { label: "Pendiente",   dot: "#3B82F6", color: "#1D4ED8", bg: "#EBF3FF", border: "#BFDBFE", avatarBg: "#3B82F6" },
+                    en_progreso: { label: "En progreso", dot: "#D97706", color: "#92400E", bg: "#FFFBEB", border: "#FDE68A", avatarBg: "#D97706" },
                     bloqueada:   { label: "Bloqueada",   dot: "#D03A3A", color: "#A82B2B", bg: "#FCE5E5", border: "#F0B0B0", avatarBg: "#D03A3A" },
-                    en_revision: { label: "En revisión", dot: "#2A6FDB", color: "#1A4FA8", bg: "#E5EEFB", border: "#B3CEFA", avatarBg: "#2A6FDB" },
                     completada:  { label: "Completada",  dot: "#1F8A5B", color: "#136E47", bg: "#E4F3EC", border: "#BFE3CE", avatarBg: "#1F8A5B" },
                     cancelada:   { label: "Cancelada",   dot: "#8E97A0", color: "#5B6770", bg: "#F0F1EF", border: "#E0E3E1", avatarBg: "#8E97A0" },
                   };
@@ -364,6 +379,12 @@ export function ResumenTab({
                         setDraggingId(t.id);
                         e.dataTransfer.setData("application/x-constructa-task", t.id.toString());
                         e.dataTransfer.effectAllowed = "copy";
+                        const ghost = document.createElement("div");
+                        ghost.style.cssText = "position:fixed;top:-9999px;left:-9999px;padding:7px 14px;border-radius:99px;background:#1B2A34;color:#fff;font:600 12.5px/1.4 'Plus Jakarta Sans',sans-serif;white-space:nowrap;pointer-events:none;";
+                        ghost.textContent = t.title;
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                       }}
                       onDragEnd={() => setDraggingId(null)}
                       style={{

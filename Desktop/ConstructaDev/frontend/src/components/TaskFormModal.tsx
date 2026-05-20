@@ -6,6 +6,7 @@ import type { Responsible, Task } from "../types";
 
 // ─── Design helpers ────────────────────────────────────────────────────────────
 
+
 const BASE_INPUT: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
@@ -290,11 +291,12 @@ export function TaskFormModal({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8 }}>
                   <input
                     type="date"
-                    style={inputStyle()}
+
+                    style={inputStyle(!!errors.startDate)}
                     value={startDate}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)}
-                    onFocus={ev => onFocusInput(ev)}
-                    onBlur={ev => onBlurInput(ev)}
+                    onFocus={ev => onFocusInput(ev, !!errors.startDate)}
+                    onBlur={ev => onBlurInput(ev, !!errors.startDate)}
                   />
                   <input
                     type="time"
@@ -306,6 +308,12 @@ export function TaskFormModal({
                     onBlur={ev => onBlurInput(ev)}
                   />
                 </div>
+                {errors.startDate && (
+                  <p style={{ margin: "5px 0 0", fontSize: 11.5, color: "#D03A3A", display: "flex", alignItems: "center", gap: 5 }}>
+                    <AlertTriangle style={{ width: 11, height: 11 }} />
+                    {errors.startDate}
+                  </p>
+                )}
               </div>
 
               {/* Due */}
@@ -314,6 +322,7 @@ export function TaskFormModal({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8 }}>
                   <input
                     type="date"
+
                     style={inputStyle(!!errors.dueDate)}
                     value={dueDate}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => setDueDate(e.target.value)}
@@ -348,16 +357,6 @@ export function TaskFormModal({
                 </svg>
                 <p style={{ margin: 0, fontSize: 12, color: "#5B6770", lineHeight: 1.45 }}>
                   Las fechas son opcionales, pero necesarias para visualizar la tarea en el cronograma.
-                </p>
-              </div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "#F4F5F4", borderRadius: 10, padding: "10px 14px" }}>
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 1, color: "#8E97A0" }}>
-                  <path d="M8 2.5a2.5 2.5 0 010 5M6 12.5c0-2 .9-3.5 2-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none"/>
-                  <circle cx="11" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.4" fill="none"/>
-                  <path d="M11 11v1.5l1 .5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
-                </svg>
-                <p style={{ margin: 0, fontSize: 12, color: "#5B6770", lineHeight: 1.45 }}>
-                  El estado de la tarea es gestionado por el chatbot y no puede modificarse manualmente.
                 </p>
               </div>
             </div>

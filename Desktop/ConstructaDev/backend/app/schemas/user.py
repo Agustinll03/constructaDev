@@ -15,9 +15,20 @@ class UserRead(BaseModel):
     full_name: str
     role: str
     is_active: bool
+    avatar_url: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UpdateProfileRequest(BaseModel):
+    full_name: str | None = Field(None, min_length=2, max_length=255)
+    avatar_url: str | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
 
 
 class LoginRequest(BaseModel):

@@ -26,9 +26,11 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.socket_manager import emit_task_updated
+from app.models.alert import AlertType
 from app.models.conversation_session import ConversationSession, ConversationStep
 from app.models.responsible import Responsible
 from app.models.task import Task, TaskStatus
+from app.repositories.alert import AlertRepository
 from app.repositories.conversation_session import ConversationSessionRepository
 from app.repositories.historial import HistorialRepository
 from app.repositories.obra import ObraRepository
@@ -39,8 +41,9 @@ from app.services.message_templates import (
     build_cancelled_message,
     build_confirmation_message,
     build_no_tasks_message,
+    build_obra_list_message,
     build_reminder_message,
-    build_reschedule_confirmation_message,
+    build_reschedule_received_message,
     build_reschedule_request_message,
     build_status_menu_message,
     build_task_list_message,
@@ -53,6 +56,7 @@ from app.services.task_service import TaskService
 
 _DATE_RE = re.compile(r"^(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?$")
 _TASKS_PER_PAGE = 5
+_URGENT_DAYS = 3  # tasks due within this window are shown as "needs attention"
 
 # ── task_options pagination helpers ───────────────────────────────────────────
 #
@@ -130,11 +134,72 @@ def _is_menu(body: str | None) -> bool:
 
 def _task_dict(task: Task, obra_name: str) -> dict:
     return {
-        "id":        task.id,
-        "title":     task.title,
-        "obra_name": obra_name,
-        "due_date":  fmt_date(task.due_date),
+        "id":           task.id,
+        "title":        task.title,
+        "obra_name":    obra_name,
+        "obra_id":      task.obra_id,
+        "due_date":     fmt_date(task.due_date),
+        "due_date_raw": str(task.due_date) if task.due_date else None,
+        "status":       task.status.value,
+        "urgency_label": _urgency_label_for(task),
     }
+
+
+def _urgency_sort_key(td: dict) -> int:
+    from datetime import timedelta
+    status = td.get("status", "")
+    if status in ("completada", "cancelada"):
+        return 99
+    due_raw = td.get("due_date_raw")
+    if status == "bloqueada" and not due_raw:
+        return 5
+    if not due_raw:
+        return 50
+    due = date.fromisoformat(due_raw)
+    today = date.today()
+    if due < today:
+        return 0
+    delta = (due - today).days
+    if delta == 0:
+        return 1
+    if delta == 1:
+        return 2
+    if delta <= _URGENT_DAYS:
+        return 3
+    if status == "bloqueada":
+        return 4
+    return 10 + delta
+
+
+def _urgency_label_for(task: Task) -> str | None:
+    today = date.today()
+    if task.due_date and task.due_date < today:
+        return "Vencida"
+    if task.status == TaskStatus.BLOQUEADA:
+        return "Demorada"
+    if not task.due_date:
+        return None
+    delta = (task.due_date - today).days
+    if delta == 0:
+        return "Vence hoy"
+    if delta == 1:
+        return "Vence mañana"
+    if delta <= _URGENT_DAYS:
+        return f"Vence en {delta} días"
+    return None
+
+
+def _needs_attention(td: dict) -> bool:
+    status = td.get("status", "")
+    if status in ("completada", "cancelada"):
+        return False
+    if status == "bloqueada":
+        return True
+    due_raw = td.get("due_date_raw")
+    if not due_raw:
+        return False
+    due = date.fromisoformat(due_raw)
+    return (due - date.today()).days <= _URGENT_DAYS
 
 
 def _parse_option(body: str | None, max_val: int) -> int | None:
@@ -186,6 +251,7 @@ class ConversationService:
         self.task_repo = TaskRepository(session)
         self.obra_repo = ObraRepository(session)
         self.historial = HistorialRepository(session)
+        self.alert_repo = AlertRepository(session)
         self.session_repo = ConversationSessionRepository(session)
         self.task_service = TaskService(session)
 
@@ -214,6 +280,9 @@ class ConversationService:
         if _is_cancel(body):
             await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
             return build_cancelled_message(), None
+
+        if conv.step == ConversationStep.OBRA_SELECT:
+            return await self._handle_obra_select(responsible, conv, body)
 
         if conv.step == ConversationStep.TASK_SELECT:
             return await self._handle_task_select(responsible, conv, body)
@@ -246,6 +315,7 @@ class ConversationService:
             task_name=td["title"],
             obra_name=td["obra_name"],
             due_date=td["due_date"],
+            current_status=td["status"],
         )
 
     # ── step handlers ──────────────────────────────────────────────────────────
@@ -253,19 +323,31 @@ class ConversationService:
     async def _start_fresh(self, responsible: Responsible) -> tuple[str, int | None]:
         tasks = await self.task_repo.list_by_responsible(responsible.id)
 
-        if not tasks:
+        # Only show active tasks
+        active = [
+            t for t in tasks
+            if t.status not in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA)
+        ]
+
+        if not active:
             await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
             return build_no_tasks_message(responsible.full_name), None
 
-        if len(tasks) == 1:
-            task = tasks[0]
+        # Build task dicts and sort by urgency
+        all_task_dicts: list[dict[str, Any]] = []
+        for task in active:
             obra = await self.obra_repo.get(task.obra_id)
             obra_name = obra.name if obra else f"Obra #{task.obra_id}"
-            td = _task_dict(task, obra_name)
+            all_task_dicts.append(_task_dict(task, obra_name))
+        all_task_dicts.sort(key=_urgency_sort_key)
+
+        # Single task → go directly to status menu
+        if len(all_task_dicts) == 1:
+            td = all_task_dicts[0]
             await self.session_repo.upsert(
                 responsible.id,
                 ConversationStep.STATUS_MENU,
-                selected_task_id=task.id,
+                selected_task_id=td["id"],
                 task_options=[td],
             )
             return (
@@ -274,18 +356,40 @@ class ConversationService:
                     task_name=td["title"],
                     obra_name=td["obra_name"],
                     due_date=td["due_date"],
+                    current_status=td["status"],
                     can_go_back=False,
                 ),
-                task.id,
+                td["id"],
             )
 
-        # Multiple tasks — build full list + paginate
-        all_task_dicts: list[dict[str, Any]] = []
-        for task in tasks:
-            obra = await self.obra_repo.get(task.obra_id)
-            obra_name = obra.name if obra else f"Obra #{task.obra_id}"
-            all_task_dicts.append(_task_dict(task, obra_name))
+        # Multiple obras → obra selection first
+        obra_ids = {td["obra_id"] for td in all_task_dicts}
+        if len(obra_ids) > 1:
+            obra_map: dict[int, dict] = {}
+            for td in all_task_dicts:
+                oid = td["obra_id"]
+                if oid not in obra_map:
+                    obra_map[oid] = {
+                        "obra_id":     oid,
+                        "obra_name":   td["obra_name"],
+                        "task_count":  0,
+                        "urgent_count": 0,
+                    }
+                obra_map[oid]["task_count"] += 1
+                if _needs_attention(td):
+                    obra_map[oid]["urgent_count"] += 1
 
+            obra_list = list(obra_map.values())
+            obra_options = [{"_meta": True, "type": "obra_select"}, *obra_list]
+            await self.session_repo.upsert(
+                responsible.id,
+                ConversationStep.OBRA_SELECT,
+                task_options=obra_options,
+            )
+            return build_obra_list_message(responsible.full_name, obra_list), None
+
+        # Single obra → show urgency-sorted task list
+        obra_name = all_task_dicts[0]["obra_name"]
         options = _make_task_options(all_task_dicts)
         await self.session_repo.upsert(
             responsible.id, ConversationStep.TASK_SELECT, task_options=options
@@ -298,6 +402,78 @@ class ConversationService:
                 has_more=_has_more(options),
                 remaining=_remaining(options),
                 is_first_page=True,
+                obra_filter=obra_name,
+            ),
+            None,
+        )
+
+    async def _handle_obra_select(
+        self,
+        responsible: Responsible,
+        conv: ConversationSession,
+        body: str | None,
+    ) -> tuple[str, int | None]:
+        options = conv.task_options or []
+        # options[0] is the meta dict; the rest are obra dicts
+        obra_list = [o for o in options if not o.get("_meta")]
+
+        n = _parse_option(body, max_val=len(obra_list))
+        if n is None:
+            prefix = "Opción inválida.\n\n" if body and body.strip() else ""
+            return prefix + build_obra_list_message(responsible.full_name, obra_list), None
+
+        chosen_obra = obra_list[n - 1]
+        obra_id = chosen_obra["obra_id"]
+
+        # Re-query tasks for this responsible, filter to selected obra
+        all_tasks = await self.task_repo.list_by_responsible(responsible.id)
+        obra_tasks = [
+            t for t in all_tasks
+            if t.obra_id == obra_id
+            and t.status not in (TaskStatus.COMPLETADA, TaskStatus.CANCELADA)
+        ]
+
+        if not obra_tasks:
+            await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
+            return build_no_tasks_message(responsible.full_name), None
+
+        obra_name = chosen_obra["obra_name"]
+        task_dicts = [_task_dict(t, obra_name) for t in obra_tasks]
+        task_dicts.sort(key=_urgency_sort_key)
+
+        if len(task_dicts) == 1:
+            td = task_dicts[0]
+            await self.session_repo.upsert(
+                responsible.id,
+                ConversationStep.STATUS_MENU,
+                selected_task_id=td["id"],
+                task_options=[td],
+            )
+            return (
+                build_status_menu_message(
+                    responsible.full_name,
+                    task_name=td["title"],
+                    obra_name=td["obra_name"],
+                    due_date=td["due_date"],
+                    current_status=td["status"],
+                    can_go_back=True,
+                ),
+                td["id"],
+            )
+
+        paged = _make_task_options(task_dicts)
+        await self.session_repo.upsert(
+            responsible.id, ConversationStep.TASK_SELECT, task_options=paged
+        )
+        pg = _page_tasks(paged)
+        return (
+            build_task_list_message(
+                responsible.full_name,
+                pg,
+                has_more=_has_more(paged),
+                remaining=_remaining(paged),
+                is_first_page=True,
+                obra_filter=obra_name,
             ),
             None,
         )
@@ -314,6 +490,10 @@ class ConversationService:
         has_more = _has_more(options)
         ver_mas_idx = len(pg) + 1
 
+        all_tasks = _all_tasks(options)
+        obra_names = {td.get("obra_name") for td in all_tasks if td.get("obra_name")}
+        obra_filter = next(iter(obra_names)) if len(obra_names) == 1 else None
+
         # "0" on first page → cancel (no previous step)
         if _is_back(body):
             if is_first_page:
@@ -329,9 +509,10 @@ class ConversationService:
                 build_task_list_message(
                     responsible.full_name,
                     prev_pg,
-                    has_more=True,  # there's a next page (the one we just came from)
+                    has_more=True,
                     remaining=_remaining(prev),
                     is_first_page=_page_of(prev) == 0,
+                    obra_filter=obra_filter,
                 ),
                 None,
             )
@@ -350,6 +531,7 @@ class ConversationService:
                     has_more=_has_more(nxt),
                     remaining=_remaining(nxt),
                     is_first_page=False,
+                    obra_filter=obra_filter,
                 ),
                 None,
             )
@@ -368,6 +550,7 @@ class ConversationService:
                     has_more=has_more,
                     remaining=_remaining(options),
                     is_first_page=is_first_page,
+                    obra_filter=obra_filter,
                 ),
                 None,
             )
@@ -386,6 +569,7 @@ class ConversationService:
                 task_name=chosen["title"],
                 obra_name=chosen["obra_name"],
                 due_date=chosen["due_date"],
+                current_status=chosen["status"],
                 can_go_back=True,
             ),
             chosen["id"],
@@ -440,6 +624,7 @@ class ConversationService:
                     task_name=opt["title"],
                     obra_name=opt["obra_name"],
                     due_date=opt["due_date"],
+                    current_status=opt["status"],
                     can_go_back=len(_all_tasks(options)) > 1,
                 )
                 if opt else "Error interno. Intentá de nuevo."
@@ -502,6 +687,7 @@ class ConversationService:
                     task_name=title,
                     obra_name=opt["obra_name"] if opt else "",
                     due_date=current_due,
+                    current_status=opt["status"] if opt else "pendiente",
                     can_go_back=len(_all_tasks(options)) > 1,
                 ),
                 task_id,
@@ -523,30 +709,35 @@ class ConversationService:
 
         if task_id:
             task = await self.task_repo.get(task_id)
-            old_due_date = task.due_date if task else None
-            await self.task_repo.update_fields(task_id, due_date=new_date)
-            task = await self.task_repo.get(task_id)
             if task:
+                suggested = fmt_date_full(new_date)
+                alert_msg = (
+                    f"{responsible.full_name} informó demora en '{task.title}'. "
+                    f"Fecha sugerida: {suggested}."
+                )
+                await self.alert_repo.create_alert(
+                    alert_type=AlertType.RESCHEDULE_REQUESTED,
+                    message=alert_msg,
+                    obra_id=task.obra_id,
+                    task_id=task_id,
+                )
                 await self.historial.log(
                     obra_id=task.obra_id,
                     task_id=task_id,
-                    event_type="task_rescheduled",
-                    description=f"Fecha reprogramada: {fmt_date(old_due_date)} → {fmt_date(new_date)}",
+                    event_type="reschedule_requested",
+                    description=f"{responsible.full_name} sugirió nueva fecha: {suggested}",
                     payload={
-                        "from": str(old_due_date) if old_due_date else None,
-                        "to": str(new_date),
+                        "suggested_date": str(new_date),
+                        "current_due_date": str(task.due_date) if task.due_date else None,
+                        "responsible_id": responsible.id,
+                        "responsible_name": responsible.full_name,
                     },
                     triggered_by="chatbot",
                 )
 
         await self.session_repo.upsert(responsible.id, ConversationStep.IDLE)
-        if task_id:
-            task = await self.task_repo.get(task_id)
-            if task:
-                await emit_task_updated(task)
-
         return (
-            build_reschedule_confirmation_message(
+            build_reschedule_received_message(
                 responsible.full_name, title, fmt_date_full(new_date)
             ),
             task_id,
