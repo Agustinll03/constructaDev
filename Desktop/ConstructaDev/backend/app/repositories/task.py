@@ -1,5 +1,5 @@
-from datetime import date
-from sqlalchemy import select, update
+from datetime import date, datetime
+from sqlalchemy import cast, DateTime as SADateTime, func, literal, select, Time as SATime, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.obra import Obra
 from app.models.task import Task, TaskStatus
@@ -39,6 +39,28 @@ class TaskRepository(BaseRepository[Task]):
                 Obra.manager_id == manager_id,
                 Task.due_date >= today,
                 Task.due_date <= deadline,
+                Task.status.notin_([TaskStatus.COMPLETADA, TaskStatus.CANCELADA]),
+            )
+            .order_by(Task.due_date, Task.id)
+        )
+        return list(result.scalars().all())
+
+    async def list_due_in_window(
+        self, window_start: datetime, window_end: datetime
+    ) -> list[Task]:
+        """Tasks whose due datetime (due_date + due_time, Argentina tz) falls within the UTC window.
+        Tasks with no due_time are treated as due at 23:59 local time."""
+        local_naive = cast(Task.due_date, SADateTime) + func.coalesce(
+            Task.due_time,
+            cast(literal("23:59:00"), SATime),
+        )
+        utc_dt = func.timezone("America/Argentina/Buenos_Aires", local_naive)
+        result = await self.session.execute(
+            select(Task)
+            .where(
+                Task.due_date.isnot(None),
+                utc_dt >= window_start,
+                utc_dt < window_end,
                 Task.status.notin_([TaskStatus.COMPLETADA, TaskStatus.CANCELADA]),
             )
             .order_by(Task.due_date, Task.id)

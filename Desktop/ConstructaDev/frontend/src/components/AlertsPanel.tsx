@@ -7,7 +7,10 @@ interface AlertsPanelProps {
 }
 
 function getAlertLabel(alert: Alert): string {
-  if (alert.type === "task_blocked") return "Tarea bloqueada";
+  if (alert.type === "task_blocked")          return "Tarea bloqueada";
+  if (alert.type === "task_overdue")          return "Tarea vencida";
+  if (alert.type === "no_response")           return "Sin respuesta";
+  if (alert.type === "reschedule_requested")  return "Demora informada";
   const msg = alert.message.toLowerCase();
   if (msg.includes("responsable"))  return "Sin responsable";
   if (msg.includes("vencida"))      return "Tarea vencida";
@@ -25,6 +28,21 @@ const typeConfig: Record<AlertType, { border: string; dot: string; badge: string
     border: "border-constructa-warning/40 bg-amber-50",
     dot:    "bg-constructa-warning",
     badge:  "text-amber-700 bg-amber-100",
+  },
+  task_overdue: {
+    border: "border-constructa-danger/30 bg-red-50",
+    dot:    "bg-constructa-danger",
+    badge:  "text-constructa-danger bg-red-100",
+  },
+  no_response: {
+    border: "border-constructa-warning/40 bg-amber-50",
+    dot:    "bg-constructa-warning",
+    badge:  "text-amber-700 bg-amber-100",
+  },
+  reschedule_requested: {
+    border: "border-blue-200 bg-blue-50",
+    dot:    "bg-blue-500",
+    badge:  "text-blue-700 bg-blue-100",
   },
 };
 

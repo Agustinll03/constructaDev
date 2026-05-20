@@ -35,14 +35,6 @@ const PROGRESS_COLOR: Record<ObraStatus, string> = {
   cancelada:   "#B0B4B0",
 };
 
-const STATUS_PCT: Record<ObraStatus, number> = {
-  planificada: 5,
-  en_progreso: 50,
-  pausada:     30,
-  completada:  100,
-  cancelada:   0,
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysRemaining(endDate: string | null): number | null {
@@ -63,7 +55,7 @@ function getInitials(name: string): string {
 function ObraCard({ obra, onSelect, isPinned, onTogglePin, members }: { obra: Obra; onSelect: () => void; isPinned: boolean; onTogglePin: () => void; members: Map<number, ApiUser> }) {
   const [imgError, setImgError] = useState(false);
   const pill      = STATUS_PILL[obra.status];
-  const pct       = STATUS_PCT[obra.status];
+  const pct       = obra.total_tasks === 0 ? 0 : Math.round((obra.completed_tasks / obra.total_tasks) * 100);
   const barColor  = PROGRESS_COLOR[obra.status];
   const days      = daysRemaining(obra.expected_end_date);
   const nameAbbr  = obra.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();

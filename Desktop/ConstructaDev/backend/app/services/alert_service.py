@@ -65,20 +65,6 @@ class AlertService:
                     obra_id, task.id, msg, "missing_responsible",
                 )
 
-            # 3. Inconsistent progress (pendiente + progress > 0)
-            if task.status == TaskStatus.PENDIENTE and task.estimated_progress > 0:
-                msg = (
-                    f"La tarea \u00ab{task.title}\u00bb figura como pendiente "
-                    f"pero tiene {task.estimated_progress}% de avance."
-                )
-                created += await self._task_alert(
-                    obra_id, task.id, msg, "inconsistent_progress",
-                    extra={
-                        "status": "pendiente",
-                        "progress": task.estimated_progress,
-                    },
-                )
-
         # ── Obra-level checks ─────────────────────────────────────────────────
 
         # 4. Many blocked tasks (>= 3)

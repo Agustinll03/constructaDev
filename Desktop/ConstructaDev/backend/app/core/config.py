@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # URL of the frontend app — used to build invite links
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Internal API key for service-to-service calls (e.g. n8n scheduled jobs)
+    INTERNAL_API_KEY: str = ""
+
     # Brevo — transactional email API
     BREVO_API_KEY: str = ""
     BREVO_SENDER_EMAIL: str = "noreply@constructa.com"

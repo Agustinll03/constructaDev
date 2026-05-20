@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { fetchAlerts, markAlertRead } from "../api/alerts";
 import { fetchHistorial } from "../api/historial";
 import { fetchResponsibles } from "../api/responsibles";
-import { fetchTasksByObra } from "../api/tasks";
+import { fetchTasksByObra, updateTaskStatus } from "../api/tasks";
 import { AlertasTab } from "../components/AlertasTab";
 import { HistorialPanel } from "../components/HistorialPanel";
 import { ResumenTab } from "../components/ResumenTab";
@@ -12,11 +12,12 @@ import { TaskDeleteConfirm } from "../components/TaskDeleteConfirm";
 import { TaskFormModal } from "../components/TaskFormModal";
 import { TaskTable } from "../components/TaskTable";
 import { ObraResponsablesTab } from "../components/ObraResponsablesTab";
+import { useAlertSocket } from "../hooks/useAlertSocket";
 import { useTaskSocket } from "../hooks/useTaskSocket";
 import { useCan } from "../hooks/usePermission";
 import { useEditingSimulation } from "../hooks/useEditingSimulation";
 import { useViewingUsers } from "../hooks/useOnlineUsers";
-import type { Alert, HistorialEvento, Obra, ObraStatus, ObraTab, Responsible, Task } from "../types";
+import type { Alert, HistorialEvento, Obra, ObraStatus, ObraTab, Responsible, Task, TaskStatus } from "../types";
 
 // ── Visual helpers ─────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
           fresh.length !== prev.length ||
           fresh.some((t) => {
             const old = prev.find((p) => p.id === t.id);
-            return !old || old.status !== t.status || old.estimated_progress !== t.estimated_progress || old.due_date !== t.due_date;
+            return !old || old.status !== t.status || old.due_date !== t.due_date;
           });
         return hasChanges ? fresh : prev;
       });
@@ -128,7 +129,7 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
       setTasks((prev) =>
         prev.map((t) =>
           t.id === payload.taskId
-            ? { ...t, title: payload.title, status: payload.status, estimated_progress: payload.estimatedProgress, responsible_id: payload.responsibleId, start_date: payload.startDate, due_date: payload.dueDate, updated_at: payload.updatedAt }
+            ? { ...t, title: payload.title, status: payload.status, responsible_id: payload.responsibleId, start_date: payload.startDate, due_date: payload.dueDate, updated_at: payload.updatedAt }
             : t
         )
       );
@@ -139,7 +140,7 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
         const newTask = {
           id: payload.taskId, obra_id: payload.obraId, title: payload.title,
           description: payload.description, status: payload.status,
-          estimated_progress: payload.estimatedProgress, responsible_id: payload.responsibleId,
+          responsible_id: payload.responsibleId,
           start_date: payload.startDate, due_date: payload.dueDate,
           start_time: payload.startTime, due_time: payload.dueTime,
           order_index: payload.orderIndex, depends_on_id: null, completed_date: null,
@@ -152,6 +153,13 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
       setTasks((prev) => prev.filter((t) => t.id !== payload.taskId));
     }, []),
   });
+
+  useAlertSocket(
+    obra.id,
+    useCallback((alert) => {
+      setAlerts((prev) => prev.some((a) => a.id === alert.id) ? prev : [alert, ...prev]);
+    }, []),
+  );
 
   async function handleMarkRead(alertId: number) {
     try {
@@ -183,6 +191,15 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
   function handleTaskDeleted() {
     setTaskToDelete(null);
     loadData(true);
+  }
+
+  async function handleStatusChange(task: Task, newStatus: TaskStatus) {
+    try {
+      const updated = await updateTaskStatus(task.id, newStatus);
+      setTasks((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+    } catch {
+      loadData(true);
+    }
   }
 
   // ── Derived values ──────────────────────────────────────────────────────────
@@ -219,6 +236,7 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
             onViewHistorial={() => onTabChange("historial")}
             onEditTask={(t) => setTaskToEdit(t)}
             onTaskRescheduled={() => loadData(true)}
+            onStatusChange={handleStatusChange}
           />
         );
 
@@ -227,11 +245,12 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
         const isActiveFn = (t: Task) => t.status !== "completada" && t.status !== "cancelada";
         const seen = new Set<number>();
         const criticalTasks: Task[] = [];
-        for (const t of [
-          ...tasks.filter((t) => t.status === "bloqueada"),
-          ...tasks.filter((t) => isActiveFn(t) && !!t.due_date && t.due_date < TODAY_T && t.status !== "bloqueada"),
-          ...tasks.filter((t) => isActiveFn(t) && !t.responsible_id && t.status !== "bloqueada" && !(t.due_date && t.due_date < TODAY_T)),
-        ]) {
+        for (const t of tasks) {
+          if (!isActiveFn(t)) continue;
+          const isBlocked    = t.status === "bloqueada";
+          const isOverdue    = !!t.due_date && t.due_date < TODAY_T;
+          const noResponsible = !t.responsible_id;
+          if (!isBlocked && !isOverdue && !noResponsible) continue;
           if (!seen.has(t.id) && criticalTasks.length < 5) { seen.add(t.id); criticalTasks.push(t); }
         }
         return (
@@ -268,8 +287,9 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
                 {/* List */}
                 <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
                   {criticalTasks.map((t, idx) => {
-                    const isBlocked = t.status === "bloqueada";
-                    const isOverdue = !isBlocked && isActiveFn(t) && !!t.due_date && t.due_date < TODAY_T;
+                    const isBlocked    = t.status === "bloqueada";
+                    const isOverdue    = isActiveFn(t) && !!t.due_date && t.due_date < TODAY_T;
+                    const noResponsible = isActiveFn(t) && !t.responsible_id;
                     return (
                       <li key={t.id} style={{
                         display: "flex", alignItems: "center", gap: 12,
@@ -282,7 +302,7 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
                             {t.title}
                           </p>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, flexWrap: "wrap" as const, justifyContent: "flex-end" }}>
                           {isBlocked && (
                             <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", background: "#FCE5E5", color: "#D03A3A" }}>
                               Bloqueada
@@ -293,7 +313,7 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
                               Vencida
                             </span>
                           )}
-                          {!isBlocked && !isOverdue && (
+                          {noResponsible && (
                             <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", background: "#FDF1DE", color: "#C97D0E" }}>
                               Sin resp.
                             </span>
@@ -370,7 +390,7 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
                 )}
               </div>
               {/* Table */}
-              <TaskTable tasks={tasks} responsibles={responsibles} onEdit={(t) => setTaskToEdit(t)} onDelete={(t) => setTaskToDelete(t)} editingMap={editingMap} />
+              <TaskTable tasks={tasks} responsibles={responsibles} onEdit={(t) => setTaskToEdit(t)} onDelete={(t) => setTaskToDelete(t)} onStatusChange={handleStatusChange} editingMap={editingMap} />
             </div>
 
           </div>

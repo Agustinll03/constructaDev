@@ -42,6 +42,17 @@ export async function updateTask(
   return data;
 }
 
+export async function updateTaskStatus(
+  id: number,
+  status: string,
+): Promise<Task> {
+  const { data } = await apiClient.post<Task>(`/tasks/${id}/status`, {
+    status,
+    triggered_by: "user",
+  });
+  return data;
+}
+
 export async function deleteTask(id: number): Promise<void> {
   await apiClient.delete(`/tasks/${id}`);
 }

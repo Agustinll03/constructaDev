@@ -24,7 +24,8 @@ _FIELD_LABELS: dict[str, str] = {
 
 
 def _to_json(v: object) -> object:
-    return str(v) if isinstance(v, date) else v
+    from datetime import time as time_type
+    return str(v) if isinstance(v, (date, time_type)) else v
 
 
 _NULL_LABELS: dict[str, str] = {
@@ -60,9 +61,8 @@ def _format_field_value(field: str, value: object) -> str:
 # These are the only allowed transitions.
 VALID_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     TaskStatus.PENDIENTE:   {TaskStatus.EN_PROGRESO, TaskStatus.CANCELADA},
-    TaskStatus.EN_PROGRESO: {TaskStatus.BLOQUEADA, TaskStatus.EN_REVISION, TaskStatus.CANCELADA},
+    TaskStatus.EN_PROGRESO: {TaskStatus.BLOQUEADA, TaskStatus.COMPLETADA, TaskStatus.CANCELADA},
     TaskStatus.BLOQUEADA:   {TaskStatus.EN_PROGRESO, TaskStatus.CANCELADA},
-    TaskStatus.EN_REVISION: {TaskStatus.EN_PROGRESO, TaskStatus.COMPLETADA, TaskStatus.CANCELADA},
     TaskStatus.COMPLETADA:  set(),
     TaskStatus.CANCELADA:   set(),
 }
@@ -290,7 +290,7 @@ class TaskService:
         old_status = task.status
 
         allowed = VALID_TRANSITIONS.get(old_status, set())
-        if update.status != old_status and update.status not in allowed:
+        if update.triggered_by != "user" and update.status != old_status and update.status not in allowed:
             raise UnprocessableError(
                 f"Transition {old_status.value!r} → {update.status.value!r} is not allowed"
             )
@@ -351,10 +351,9 @@ class TaskService:
         """Cascade through intermediate states to reach COMPLETADA (used by chatbot)."""
         task = await self.get_or_raise(task_id)
         chains: dict[TaskStatus, list[TaskStatus]] = {
-            TaskStatus.PENDIENTE:   [TaskStatus.EN_PROGRESO, TaskStatus.EN_REVISION, TaskStatus.COMPLETADA],
-            TaskStatus.EN_PROGRESO: [TaskStatus.EN_REVISION, TaskStatus.COMPLETADA],
-            TaskStatus.BLOQUEADA:   [TaskStatus.EN_PROGRESO, TaskStatus.EN_REVISION, TaskStatus.COMPLETADA],
-            TaskStatus.EN_REVISION: [TaskStatus.COMPLETADA],
+            TaskStatus.PENDIENTE:   [TaskStatus.EN_PROGRESO, TaskStatus.COMPLETADA],
+            TaskStatus.EN_PROGRESO: [TaskStatus.COMPLETADA],
+            TaskStatus.BLOQUEADA:   [TaskStatus.EN_PROGRESO, TaskStatus.COMPLETADA],
             TaskStatus.COMPLETADA:  [],
             TaskStatus.CANCELADA:   [],
         }

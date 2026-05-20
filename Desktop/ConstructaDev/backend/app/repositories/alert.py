@@ -16,13 +16,16 @@ class AlertRepository(BaseRepository[Alert]):
         obra_id: int | None = None,
         task_id: int | None = None,
     ) -> Alert:
+        from app.core.socket_manager import emit_alert_created
         alert = Alert(
             type=alert_type,
             message=message,
             obra_id=obra_id,
             task_id=task_id,
         )
-        return await self.create(alert)
+        alert = await self.create(alert)
+        await emit_alert_created(alert)
+        return alert
 
     async def exists_unread_for_task(
         self,

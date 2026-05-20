@@ -279,10 +279,10 @@ export function ObraResponsablesTab({ responsibles, tasks, onRefresh }: ObraResp
                 {/* Column labels */}
                 <div style={{
                   display: "grid",
-                  gridTemplateColumns: "280px 140px 200px 100px 80px 88px",
+                  gridTemplateColumns: "280px 140px 200px 1fr 160px",
                   padding: "8px 20px", borderBottom: "1px solid #F2F0EC",
                 }}>
-                  {["Nombre", "Rol", "WhatsApp", "Tareas", "Estado", ""].map(label => (
+                  {["Nombre", "Rol", "WhatsApp", "Tareas", ""].map(label => (
                     <span key={label} style={{
                       fontSize: 10, fontWeight: 600, color: "#ADAAA4",
                       letterSpacing: "0.1em", textTransform: "uppercase" as const,
@@ -300,10 +300,11 @@ export function ObraResponsablesTab({ responsibles, tasks, onRefresh }: ObraResp
                     return (
                       <li key={r.id} style={{
                         display: "grid",
-                        gridTemplateColumns: "280px 140px 200px 100px 80px 88px",
+                        gridTemplateColumns: "280px 140px 200px 1fr 160px",
                         alignItems: "center",
-                        padding: "0 20px", minHeight: 56, opacity: 0.55,
+                        padding: "0 20px", minHeight: 56,
                         borderBottom: idx < inactive.length - 1 ? "1px solid #F2F0EC" : "none",
+                        opacity: 0.7,
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <div style={{
@@ -326,34 +327,30 @@ export function ObraResponsablesTab({ responsibles, tasks, onRefresh }: ObraResp
                         }}>
                           {total > 0 ? total : "—"}
                         </span>
-                        <span style={{
-                          display: "inline-block", padding: "2px 8px", borderRadius: 99,
-                          fontSize: 10.5, fontWeight: 600, color: "#8E97A0",
-                          background: "#F0F1EF", border: "1px solid #E6E7E5",
-                        }}>
-                          Inactivo
-                        </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <button
                             onClick={() => setToReactivate(r)}
-                            title="Reactivar"
                             style={{
-                              display: "flex", alignItems: "center", gap: 4,
-                              padding: "5px 8px", borderRadius: 7, border: "1px solid #E6E7E5",
-                              fontSize: 11.5, fontWeight: 600, color: "#1F8A5B",
-                              background: "#fff", cursor: "pointer",
-                              transition: "border-color 0.15s, background 0.15s",
+                              display: "flex", alignItems: "center", gap: 6,
+                              padding: "6px 12px", borderRadius: 8,
+                              border: "1.5px solid #1F9A5A",
+                              fontSize: 12, fontWeight: 600, color: "#1F9A5A",
+                              background: "#F0FAF5", cursor: "pointer",
+                              transition: "background 0.15s, box-shadow 0.15s",
+                              boxShadow: "none",
+                              whiteSpace: "nowrap" as const,
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.background = "#E4F3EC"; e.currentTarget.style.borderColor = "#1F8A5B"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#E6E7E5"; }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "#D6F0E4"; e.currentTarget.style.boxShadow = "0 2px 8px -2px rgba(31,154,90,0.25)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "#F0FAF5"; e.currentTarget.style.boxShadow = "none"; }}
                           >
-                            <UserCheck style={{ width: 11, height: 11 }} />
+                            <UserCheck style={{ width: 13, height: 13 }} />
+                            Reactivar
                           </button>
                           <button
                             onClick={() => setToEdit(r)}
                             title="Editar"
                             style={{
-                              width: 28, height: 28, borderRadius: 7, border: "none",
+                              width: 30, height: 30, borderRadius: 7, border: "none",
                               background: "transparent", cursor: "pointer",
                               display: "flex", alignItems: "center", justifyContent: "center",
                               color: "#8E97A0", transition: "background 0.15s, color 0.15s",

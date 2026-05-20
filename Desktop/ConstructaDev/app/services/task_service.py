@@ -10,12 +10,11 @@ from app.core.exceptions import NotFoundError, ForbiddenError, UnprocessableErro
 
 # Transitions the system allows. AI pipeline uses apply_status_update.
 VALID_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
-    TaskStatus.PENDIENTE:    {TaskStatus.EN_PROGRESO, TaskStatus.CANCELADA},
-    TaskStatus.EN_PROGRESO:  {TaskStatus.BLOQUEADA, TaskStatus.EN_REVISION, TaskStatus.CANCELADA},
-    TaskStatus.BLOQUEADA:    {TaskStatus.EN_PROGRESO, TaskStatus.CANCELADA},
-    TaskStatus.EN_REVISION:  {TaskStatus.EN_PROGRESO, TaskStatus.COMPLETADA, TaskStatus.CANCELADA},
-    TaskStatus.COMPLETADA:   set(),
-    TaskStatus.CANCELADA:    set(),
+    TaskStatus.PENDIENTE:   {TaskStatus.EN_PROGRESO, TaskStatus.CANCELADA},
+    TaskStatus.EN_PROGRESO: {TaskStatus.BLOQUEADA, TaskStatus.COMPLETADA, TaskStatus.CANCELADA},
+    TaskStatus.BLOQUEADA:   {TaskStatus.EN_PROGRESO, TaskStatus.CANCELADA},
+    TaskStatus.COMPLETADA:  set(),
+    TaskStatus.CANCELADA:   set(),
 }
 
 

@@ -19,7 +19,9 @@ class ObraRepository(BaseRepository[Obra]):
 
     async def list_all(self) -> list[Obra]:
         result = await self.session.execute(
-            select(Obra).order_by(Obra.created_at.desc())
+            select(Obra)
+            .options(selectinload(Obra.tasks))
+            .order_by(Obra.created_at.desc())
         )
         return list(result.scalars().all())
 

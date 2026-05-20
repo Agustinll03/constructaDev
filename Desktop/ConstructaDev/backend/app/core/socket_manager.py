@@ -203,7 +203,6 @@ async def emit_task_created(task, actor: dict | None = None) -> None:
         "title": task.title,
         "description": task.description,
         "status": task.status.value,
-        "estimatedProgress": task.estimated_progress,
         "responsibleId": task.responsible_id,
         "startDate": str(task.start_date) if task.start_date else None,
         "dueDate": str(task.due_date) if task.due_date else None,
@@ -225,7 +224,6 @@ async def emit_task_updated(task, actor: dict | None = None) -> None:
         "title": task.title,
         "responsibleId": task.responsible_id,
         "status": task.status.value,
-        "estimatedProgress": task.estimated_progress,
         "startDate": str(task.start_date) if task.start_date else None,
         "dueDate": str(task.due_date) if task.due_date else None,
         "updatedAt": task.updated_at.isoformat(),
@@ -233,6 +231,21 @@ async def emit_task_updated(task, actor: dict | None = None) -> None:
     }
     await sio.emit("task_updated", payload, room=f"obra_{task.obra_id}")
     logger.debug("task_updated taskId=%d obraId=%d", task.id, task.obra_id)
+
+
+async def emit_alert_created(alert) -> None:
+    payload = {
+        "id":         alert.id,
+        "obraId":     alert.obra_id,
+        "taskId":     alert.task_id,
+        "type":       alert.type.value,
+        "message":    alert.message,
+        "is_read":    alert.is_read,
+        "created_at": alert.created_at.isoformat(),
+    }
+    if alert.obra_id:
+        await sio.emit("alert_created", payload, room=f"obra_{alert.obra_id}")
+    logger.debug("alert_created alertId=%d obraId=%s", alert.id, alert.obra_id)
 
 
 async def emit_task_deleted(task_id: int, obra_id: int, title: str, actor: dict | None = None) -> None:

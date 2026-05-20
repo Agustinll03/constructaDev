@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.obra import Obra
+from app.models.task import TaskStatus
 from app.repositories.historial import HistorialRepository
 from app.repositories.obra import ObraRepository
 from app.schemas.obra import ObraCreate, ObraUpdate
@@ -39,8 +40,21 @@ class ObraService:
     async def list_mine(self, manager_id: int) -> list[Obra]:
         return await self.repo.list_by_manager(manager_id)
 
-    async def list_all(self) -> list[Obra]:
-        return await self.repo.list_all()
+    async def list_all(self) -> list[dict]:
+        obras = await self.repo.list_all()
+        result = []
+        for o in obras:
+            non_cancelled = [t for t in o.tasks if t.status != TaskStatus.CANCELADA]
+            completed     = [t for t in o.tasks if t.status == TaskStatus.COMPLETADA]
+            result.append({
+                "id": o.id, "name": o.name, "status": o.status,
+                "location": o.location, "image_url": o.image_url,
+                "start_date": o.start_date, "expected_end_date": o.expected_end_date,
+                "actual_end_date": o.actual_end_date, "manager_id": o.manager_id,
+                "completed_tasks": len(completed),
+                "total_tasks": len(non_cancelled),
+            })
+        return result
 
     async def update(self, obra_id: int, data: ObraUpdate, manager_id: int, actor: dict | None = None) -> Obra:
         obra = await self.get_for_manager(obra_id, manager_id)

@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { GanttTimeline } from "./GanttTimeline";
 import { HistorialPanel } from "./HistorialPanel";
-import type { Alert, HistorialEvento, Responsible, Task } from "../types";
+import type { Alert, HistorialEvento, Responsible, Task, TaskStatus } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +69,7 @@ interface ResumenTabProps {
   onViewHistorial?: () => void;
   onEditTask: (task: Task) => void;
   onTaskRescheduled: () => void;
+  onStatusChange?: (task: Task, newStatus: TaskStatus) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -86,6 +87,7 @@ export function ResumenTab({
   onViewHistorial,
   onEditTask,
   onTaskRescheduled,
+  onStatusChange,
 }: ResumenTabProps) {
   const [draggingId, setDraggingId] = useState<number | null>(null);
 
@@ -95,9 +97,10 @@ export function ResumenTab({
   const completedCount = tasks.filter((t) => t.status === "completada").length;
   const unreadAlerts   = alerts.filter((a) => !a.is_read);
   const unreadCount    = unreadAlerts.length;
-  const avgProgress    = total === 0
+  const nonCancelled = tasks.filter((t) => t.status !== "cancelada");
+  const avgProgress  = nonCancelled.length === 0
     ? 0
-    : Math.round(tasks.reduce((s, t) => s + t.estimated_progress, 0) / total);
+    : Math.round((completedCount / nonCancelled.length) * 100);
 
   const tasksWithoutDates = tasks.filter((t) => !t.start_date && !t.due_date);
 
@@ -127,7 +130,6 @@ export function ResumenTab({
   const statusDist = total === 0 ? null : {
     completada:  tasks.filter(t => t.status === "completada").length  / total * 100,
     en_progreso: tasks.filter(t => t.status === "en_progreso").length / total * 100,
-    en_revision: tasks.filter(t => t.status === "en_revision").length / total * 100,
     pendiente:   tasks.filter(t => t.status === "pendiente").length   / total * 100,
     bloqueada:   tasks.filter(t => t.status === "bloqueada").length   / total * 100,
   };
@@ -199,9 +201,8 @@ export function ResumenTab({
           {statusDist && (
             <div style={{ display: "flex", height: 6, borderRadius: 99, overflow: "hidden", background: "#F0F1EF" }} title="Distribución por estado">
               {statusDist.completada  > 0 && <span style={{ background: "#1F8A5B", width: statusDist.completada  + "%" }} />}
-              {statusDist.en_progreso > 0 && <span style={{ background: "#E85A26", width: statusDist.en_progreso + "%" }} />}
-              {statusDist.en_revision > 0 && <span style={{ background: "#2A6FDB", width: statusDist.en_revision + "%" }} />}
-              {statusDist.pendiente   > 0 && <span style={{ background: "#E89B14", width: statusDist.pendiente   + "%" }} />}
+              {statusDist.en_progreso > 0 && <span style={{ background: "#D97706", width: statusDist.en_progreso + "%" }} />}
+              {statusDist.pendiente   > 0 && <span style={{ background: "#3B82F6", width: statusDist.pendiente   + "%" }} />}
               {statusDist.bloqueada   > 0 && <span style={{ background: "#D03A3A", width: statusDist.bloqueada   + "%" }} />}
             </div>
           )}
@@ -285,6 +286,7 @@ export function ResumenTab({
           obraExpectedEndDate={obraExpectedEndDate}
           onSaved={onTaskRescheduled}
           onEditTask={onEditTask}
+          onStatusChange={onStatusChange}
           tasksWithoutDates={tasksWithoutDates.length}
         />
       </section>
@@ -359,10 +361,9 @@ export function ResumenTab({
               <ol style={{ margin: 0, padding: "0 20px", listStyle: "none" }}>
                 {tasksWithoutDates.slice(0, 5).map((t, i) => {
                   const STATUS_STYLE: Record<string, { label: string; dot: string; color: string; bg: string; border: string; avatarBg: string }> = {
-                    pendiente:   { label: "Pendiente",   dot: "#E89B14", color: "#9A5D08", bg: "#FDF1DE", border: "#F0D5A0", avatarBg: "#E89B14" },
-                    en_progreso: { label: "En progreso", dot: "#E85A26", color: "#C74018", bg: "#FFF1E9", border: "#FDBFA0", avatarBg: "#E85A26" },
+                    pendiente:   { label: "Pendiente",   dot: "#3B82F6", color: "#1D4ED8", bg: "#EBF3FF", border: "#BFDBFE", avatarBg: "#3B82F6" },
+                    en_progreso: { label: "En progreso", dot: "#D97706", color: "#92400E", bg: "#FFFBEB", border: "#FDE68A", avatarBg: "#D97706" },
                     bloqueada:   { label: "Bloqueada",   dot: "#D03A3A", color: "#A82B2B", bg: "#FCE5E5", border: "#F0B0B0", avatarBg: "#D03A3A" },
-                    en_revision: { label: "En revisión", dot: "#2A6FDB", color: "#1A4FA8", bg: "#E5EEFB", border: "#B3CEFA", avatarBg: "#2A6FDB" },
                     completada:  { label: "Completada",  dot: "#1F8A5B", color: "#136E47", bg: "#E4F3EC", border: "#BFE3CE", avatarBg: "#1F8A5B" },
                     cancelada:   { label: "Cancelada",   dot: "#8E97A0", color: "#5B6770", bg: "#F0F1EF", border: "#E0E3E1", avatarBg: "#8E97A0" },
                   };
@@ -378,6 +379,12 @@ export function ResumenTab({
                         setDraggingId(t.id);
                         e.dataTransfer.setData("application/x-constructa-task", t.id.toString());
                         e.dataTransfer.effectAllowed = "copy";
+                        const ghost = document.createElement("div");
+                        ghost.style.cssText = "position:fixed;top:-9999px;left:-9999px;padding:7px 14px;border-radius:99px;background:#1B2A34;color:#fff;font:600 12.5px/1.4 'Plus Jakarta Sans',sans-serif;white-space:nowrap;pointer-events:none;";
+                        ghost.textContent = t.title;
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                       }}
                       onDragEnd={() => setDraggingId(null)}
                       style={{

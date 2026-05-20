@@ -28,12 +28,6 @@ _COMPLETION_WORDS: frozenset[str] = frozenset(
     {"terminado", "finalizado", "listo", "completado"}
 )
 
-_PROGRESS_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"\b(\d{1,3})\s*%"),         # "50%"  or  "50 %"
-    re.compile(r"\bavance\s+(\d{1,3})\b"),   # "avance 50"
-    re.compile(r"\bvamos\s+(\d{1,3})\b"),    # "vamos 70"
-]
-
 
 @dataclass
 class InterpretationResult:
@@ -76,21 +70,7 @@ def interpret(body: str | None) -> InterpretationResult:
                 matched_rule="completion_keyword",
             )
 
-    # 2. Progress percentage — before block phrases to avoid treating "50%" as a delay
-    for pattern in _PROGRESS_PATTERNS:
-        m = pattern.search(text)
-        if m:
-            pct = int(m.group(1))
-            if 0 <= pct <= 100:
-                return InterpretationResult(
-                    action="progress",
-                    status=TaskStatus.EN_PROGRESO,
-                    progress=pct,
-                    reason=f"Progress indicator: {pct}%",
-                    matched_rule="progress_percentage",
-                )
-
-    # 3. Block / delay phrases (multi-word entries checked first by list order)
+    # 2. Block / delay phrases (multi-word entries checked first by list order)
     for phrase in _BLOCKED_PHRASES:
         if phrase in text:
             return InterpretationResult(

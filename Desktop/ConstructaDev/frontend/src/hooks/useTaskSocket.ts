@@ -17,7 +17,6 @@ export interface TaskUpdatedPayload {
   title: string;
   responsibleId: number | null;
   status: TaskStatus;
-  estimatedProgress: number;
   startDate: string | null;
   dueDate: string | null;
   updatedAt: string;
@@ -30,7 +29,6 @@ export interface TaskCreatedPayload {
   title: string;
   description: string | null;
   status: TaskStatus;
-  estimatedProgress: number;
   responsibleId: number | null;
   startDate: string | null;
   dueDate: string | null;
@@ -58,7 +56,6 @@ export function taskFromCreatedPayload(p: TaskCreatedPayload): Task {
     title: p.title,
     description: p.description,
     status: p.status,
-    estimated_progress: p.estimatedProgress,
     responsible_id: p.responsibleId,
     start_date: p.startDate,
     due_date: p.dueDate,
