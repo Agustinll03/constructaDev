@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { PlusIcon, MagnifyingGlassIcon, MapPinIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, MapPinIcon } from "@heroicons/react/24/outline";
+import { GooeyInput } from "@/components/ui/gooey-input";
 import { fetchObras } from "../api/obras";
 import { fetchMembers, type ApiUser } from "../api/users";
 import { userAvatarColor } from "../context/UserContext";
@@ -358,37 +359,14 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* Search */}
-          <div style={{ position: "relative" }}>
-            <MagnifyingGlassIcon style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, color: "#8E97A0", pointerEvents: "none" }} />
-            <input
-              type="text"
-              placeholder="Buscar obras…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{
-                paddingLeft: 32, paddingRight: search ? 28 : 36,
-                paddingTop: 8, paddingBottom: 8,
-                fontSize: 12.5, background: "#fff",
-                border: `1px solid ${search ? "#FF6B35" : "#E6E7E5"}`,
-                borderRadius: 10,
-                color: search ? "#1A2329" : "#8E97A0",
-                outline: "none", cursor: "text", width: 190,
-                transition: "border-color 0.15s",
-              }}
-              onFocus={e => { if (!search) e.currentTarget.style.borderColor = "#D5D7D3"; }}
-              onBlur={e => { if (!search) e.currentTarget.style.borderColor = "#E6E7E5"; }}
-            />
-            {search ? (
-              <button
-                onClick={() => setSearch("")}
-                style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, borderRadius: 99, background: "#C0C4C0", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", padding: 0 }}
-              >
-                <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              </button>
-            ) : (
-              <kbd style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 9.5, fontFamily: "'JetBrains Mono', monospace", color: "#8E97A0", background: "#F4F5F4", padding: "1px 5px", borderRadius: 4, border: "1px solid #E6E7E5" }}>⌘K</kbd>
-            )}
-          </div>
+          <GooeyInput
+            placeholder="Buscar obras…"
+            value={search}
+            onValueChange={setSearch}
+            collapsedWidth={120}
+            expandedWidth={220}
+            expandedOffset={48}
+          />
 
           {/* Nueva obra */}
           {canCreateObra && (
