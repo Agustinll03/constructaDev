@@ -15,6 +15,7 @@ from app.models.message import (
 from app.models.alert import Alert, AlertType
 from app.models.conversation_session import ConversationSession, ConversationStep
 from app.models.settings import SystemSettings
+from app.models.document import Document, DocumentCategory, DocumentStatus
 
 __all__ = [
     "User",
@@ -34,4 +35,7 @@ __all__ = [
     "ConversationSession",
     "ConversationStep",
     "SystemSettings",
+    "Document",
+    "DocumentCategory",
+    "DocumentStatus",
 ]

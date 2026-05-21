@@ -155,9 +155,9 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
           color: "#fff", fontWeight: 700, fontSize: 11,
           display: "flex", alignItems: "center", justifyContent: "center",
           fontFamily: "'Plus Jakarta Sans', sans-serif",
-        }}>EV</div>
+        }}>RO</div>
         <div style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-          <div style={{ color: "#fff", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Estudio Velar</div>
+          <div style={{ color: "#fff", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>RODE</div>
           <div style={{ fontSize: 10.5, color: "#8C969C", letterSpacing: "0.04em" }}>Workspace</div>
         </div>
         <ChevronDownIcon style={{ width: 12, height: 12, color: "#6B767E", flexShrink: 0 }} />
@@ -230,6 +230,12 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
               active={activePage === "panel" && activeTab === "historial"}
               onClick={() => onTabChange("historial")}
               icon={<ClockIcon style={ICON_SIZE} />}
+            />
+            <NavItem
+              label="Documentos"
+              active={activePage === "panel" && activeTab === "documentos"}
+              onClick={() => onTabChange("documentos")}
+              icon={<DocumentTextIcon style={ICON_SIZE} />}
             />
           </>
         )}
