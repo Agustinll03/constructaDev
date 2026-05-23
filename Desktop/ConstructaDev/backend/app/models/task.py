@@ -90,3 +90,4 @@ class Task(Base):
         "HistorialEvento", back_populates="task"
     )
     alerts: Mapped[list["Alert"]] = relationship("Alert", back_populates="task")
+    documents: Mapped[list["Document"]] = relationship("Document", back_populates="task")

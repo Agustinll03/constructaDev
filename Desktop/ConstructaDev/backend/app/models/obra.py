@@ -58,3 +58,6 @@ class Obra(Base):
         "HistorialEvento", back_populates="obra"
     )
     alerts: Mapped[list["Alert"]] = relationship("Alert", back_populates="obra")
+    documents: Mapped[list["Document"]] = relationship(
+        "Document", back_populates="obra", cascade="all, delete-orphan"
+    )
