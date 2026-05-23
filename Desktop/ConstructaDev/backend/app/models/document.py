@@ -55,6 +55,7 @@ class Document(Base):
     )
 
     original_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
     stored_name: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
     file_url: Mapped[str] = mapped_column(String(1000), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

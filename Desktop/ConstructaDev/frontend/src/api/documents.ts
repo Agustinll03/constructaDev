@@ -11,6 +11,7 @@ export interface UploadDocumentPayload {
   category: DocumentCategory;
   taskId?: number | null;
   notes?: string | null;
+  originalName?: string | null;
   file: File;
 }
 
@@ -20,6 +21,7 @@ export async function uploadDocument(payload: UploadDocumentPayload): Promise<Do
   form.append("category", payload.category);
   if (payload.taskId != null) form.append("task_id", String(payload.taskId));
   if (payload.notes) form.append("notes", payload.notes);
+  if (payload.originalName) form.append("original_name", payload.originalName);
   form.append("file", payload.file);
   const { data } = await apiClient.post<Document>("/documents/upload", form, {
     headers: { "Content-Type": "multipart/form-data" },

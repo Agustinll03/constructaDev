@@ -38,6 +38,7 @@ export interface Document {
   category: DocumentCategory;
   status: DocumentStatus;
   original_name: string;
+  display_name: string | null;
   file_url: string;
   notes: string | null;
   version: number;

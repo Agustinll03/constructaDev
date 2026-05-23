@@ -32,6 +32,7 @@ def _to_read(doc: Document) -> DocumentRead:
         category=doc.category,
         status=doc.status,
         original_name=doc.original_name,
+        display_name=doc.display_name,
         file_url=doc.file_url,
         notes=doc.notes,
         version=doc.version,
@@ -47,9 +48,11 @@ async def upload_document(
     category: DocumentCategory = Form(...),
     task_id: int | None = Form(None),
     notes: str | None = Form(None),
+    original_name: str | None = Form(None),
     file: UploadFile = File(...),
 ) -> DocumentRead:
-    raw_name = file.filename or "documento"
+    actual_name = file.filename or "documento"
+    raw_name = original_name or actual_name
     ext = raw_name.rsplit(".", 1)[-1].lower() if "." in raw_name else ""
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"Extensión no permitida: .{ext}")
@@ -71,6 +74,7 @@ async def upload_document(
         uploaded_by=current_user.id,
         category=category,
         original_name=raw_name,
+        display_name=actual_name,
         stored_name=stored_name,
         file_url=file_url,
         notes=notes,

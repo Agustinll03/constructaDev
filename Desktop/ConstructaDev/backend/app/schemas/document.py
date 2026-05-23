@@ -12,6 +12,7 @@ class DocumentRead(BaseModel):
     category: DocumentCategory
     status: DocumentStatus
     original_name: str
+    display_name: str | None
     file_url: str
     notes: str | None
     version: int

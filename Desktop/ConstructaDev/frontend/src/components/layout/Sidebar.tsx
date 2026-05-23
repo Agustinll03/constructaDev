@@ -241,18 +241,22 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
         )}
       </nav>
 
-      {/* ── ORGANIZACIÓN section ── */}
-      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
-        Organización
-      </div>
-      <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <NavItem
-          label="Gestión de equipo"
-          active={activePage === "equipo"}
-          onClick={() => onNavigate("equipo")}
-          icon={<UsersIcon style={ICON_SIZE} />}
-        />
-      </nav>
+      {/* ── ORGANIZACIÓN section — solo visible fuera del detalle de obra ── */}
+      {!selectedObra && (
+        <>
+          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
+            Organización
+          </div>
+          <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <NavItem
+              label="Gestión de equipo"
+              active={activePage === "equipo"}
+              onClick={() => onNavigate("equipo")}
+              icon={<UsersIcon style={ICON_SIZE} />}
+            />
+          </nav>
+        </>
+      )}
 
       {/* ── CUENTA section ── */}
       <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
