@@ -224,6 +224,7 @@ export function TaskFormModal({
                 style={inputStyle(!!errors.title)}
                 placeholder="Ej: Excavación y nivelación del terreno"
                 value={title}
+                data-cy="task-title-input"
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
                 onFocus={ev => onFocusInput(ev, !!errors.title)}
                 onBlur={ev => onBlurInput(ev, !!errors.title)}
@@ -397,6 +398,7 @@ export function TaskFormModal({
             <button
               type="submit"
               disabled={saving}
+              data-cy="task-submit-btn"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 7,
                 padding: "9px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600,

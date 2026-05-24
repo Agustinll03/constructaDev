@@ -365,6 +365,7 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
         <button
           onClick={onLogout}
           title="Cerrar sesión"
+          data-cy="logout-btn"
           style={{ background: "none", border: "none", cursor: "pointer", color: "#6B767E", padding: 4, display: "flex", alignItems: "center" }}
           onMouseEnter={e => (e.currentTarget.style.color = "#CFD4D7")}
           onMouseLeave={e => (e.currentTarget.style.color = "#6B767E")}
