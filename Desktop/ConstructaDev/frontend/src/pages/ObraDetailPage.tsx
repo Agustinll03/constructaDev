@@ -645,6 +645,7 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
             {activeTab === "resumen" && can("tarea.create") && (
               <button
                 onClick={() => setShowCreateTask(true)}
+                data-cy="nueva-tarea-btn"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 7,
                   padding: "9px 14px", borderRadius: 10,

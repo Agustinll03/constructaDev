@@ -4,18 +4,8 @@ import { updateTask } from "../api/tasks";
 import type { TaskUpdatePayload } from "../api/tasks";
 import { Button } from "./ui/Button";
 import type { Task } from "../types";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtDate(d: string | null): string {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
-}
-
-function diffDays(a: string, b: string): number {
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000);
-}
+import { fmtDateShort } from "../lib/formatUtils";
+import { diffDays } from "../lib/taskUtils";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -106,11 +96,11 @@ export function ReschedulingModal({
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-sm text-constructa-secondaryText">
                   <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>Inicio: <span className="font-semibold text-constructa-text">{fmtDate(oldStart)}</span></span>
+                  <span>Inicio: <span className="font-semibold text-constructa-text">{fmtDateShort(oldStart)}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5 text-sm text-constructa-secondaryText">
                   <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>Vence: <span className="font-semibold text-constructa-text">{fmtDate(oldDue)}</span></span>
+                  <span>Vence: <span className="font-semibold text-constructa-text">{fmtDateShort(oldDue)}</span></span>
                 </div>
               </div>
             </div>
@@ -122,11 +112,11 @@ export function ReschedulingModal({
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-sm text-constructa-secondaryText">
                   <Calendar className="w-3.5 h-3.5 flex-shrink-0 text-constructa-primary" />
-                  <span>Inicio: <span className="font-semibold text-constructa-text">{fmtDate(newStartDate)}</span></span>
+                  <span>Inicio: <span className="font-semibold text-constructa-text">{fmtDateShort(newStartDate)}</span></span>
                 </div>
                 <div className="flex items-center gap-1.5 text-sm text-constructa-secondaryText">
                   <Calendar className="w-3.5 h-3.5 flex-shrink-0 text-constructa-primary" />
-                  <span>Vence: <span className="font-semibold text-constructa-text">{fmtDate(newDueDate)}</span></span>
+                  <span>Vence: <span className="font-semibold text-constructa-text">{fmtDateShort(newDueDate)}</span></span>
                 </div>
               </div>
             </div>

@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 hero-video.mp4
+cypress.env.json
+cypress/videos
+cypress/screenshots

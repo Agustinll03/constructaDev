@@ -24,3 +24,7 @@ export async function createObra(payload: ObraCreatePayload): Promise<Obra> {
   const { data } = await apiClient.post<Obra>("/obras", payload);
   return data;
 }
+
+export async function deleteObra(obraId: number): Promise<void> {
+  await apiClient.delete(`/obras/${obraId}`);
+}
