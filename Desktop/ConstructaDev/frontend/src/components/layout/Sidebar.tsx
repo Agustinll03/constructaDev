@@ -155,9 +155,9 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
           color: "#fff", fontWeight: 700, fontSize: 11,
           display: "flex", alignItems: "center", justifyContent: "center",
           fontFamily: "'Plus Jakarta Sans', sans-serif",
-        }}>RO</div>
+        }}>EV</div>
         <div style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-          <div style={{ color: "#fff", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>RODE</div>
+          <div style={{ color: "#fff", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Estudio Velar</div>
           <div style={{ fontSize: 10.5, color: "#8C969C", letterSpacing: "0.04em" }}>Workspace</div>
         </div>
         <ChevronDownIcon style={{ width: 12, height: 12, color: "#6B767E", flexShrink: 0 }} />
@@ -231,32 +231,22 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
               onClick={() => onTabChange("historial")}
               icon={<ClockIcon style={ICON_SIZE} />}
             />
-            <NavItem
-              label="Documentos"
-              active={activePage === "panel" && activeTab === "documentos"}
-              onClick={() => onTabChange("documentos")}
-              icon={<DocumentTextIcon style={ICON_SIZE} />}
-            />
           </>
         )}
       </nav>
 
-      {/* ── ORGANIZACIÓN section — solo visible fuera del detalle de obra ── */}
-      {!selectedObra && (
-        <>
-          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
-            Organización
-          </div>
-          <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <NavItem
-              label="Gestión de equipo"
-              active={activePage === "equipo"}
-              onClick={() => onNavigate("equipo")}
-              icon={<UsersIcon style={ICON_SIZE} />}
-            />
-          </nav>
-        </>
-      )}
+      {/* ── ORGANIZACIÓN section ── */}
+      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
+        Organización
+      </div>
+      <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        <NavItem
+          label="Gestión de equipo"
+          active={activePage === "equipo"}
+          onClick={() => onNavigate("equipo")}
+          icon={<UsersIcon style={ICON_SIZE} />}
+        />
+      </nav>
 
       {/* ── CUENTA section ── */}
       <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
@@ -365,7 +355,6 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
         <button
           onClick={onLogout}
           title="Cerrar sesión"
-          data-cy="logout-btn"
           style={{ background: "none", border: "none", cursor: "pointer", color: "#6B767E", padding: 4, display: "flex", alignItems: "center" }}
           onMouseEnter={e => (e.currentTarget.style.color = "#CFD4D7")}
           onMouseLeave={e => (e.currentTarget.style.color = "#6B767E")}

@@ -177,7 +177,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   onChange={(e) => { setEmail(e.target.value); setError(null); }}
                   placeholder="manager@constructa.com"
                   className="w-full pl-10 pr-4 py-3 bg-transparent text-sm text-constructa-text placeholder-constructa-border focus:outline-none"
-                  data-cy="email-input"
                 />
               </div>
             </div>
@@ -201,7 +200,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••"
                   className="w-full pl-10 pr-12 py-3 bg-transparent text-sm text-constructa-text placeholder-constructa-border focus:outline-none"
-                  data-cy="password-input"
                 />
                 <button
                   type="button"
@@ -216,7 +214,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
             {/* Error */}
             {error && (
-              <div data-cy="error-message" style={{
+              <div style={{
                 display: "flex", alignItems: "center", gap: 10,
                 background: "#FEF2F2", border: "1px solid #FECACA",
                 borderRadius: 10, padding: "12px 14px",
@@ -235,7 +233,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <button
                 type="submit"
                 disabled={loading}
-                data-cy="submit-btn"
                 className="w-full bg-constructa-primary hover:bg-orange-600 active:scale-[0.99] text-white font-display font-bold py-3.5 rounded-lg transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-sm uppercase tracking-widest"
               >
                 {loading ? (

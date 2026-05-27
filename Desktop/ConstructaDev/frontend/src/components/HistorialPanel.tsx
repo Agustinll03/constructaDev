@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Activity } from "lucide-react";
 import type { HistorialEvento, Task } from "../types/index";
-import { getInitials, avatarColor, relativeTime } from "../lib/formatUtils";
 
 // ─── Badge types ──────────────────────────────────────────────────────────────
 
@@ -29,6 +28,29 @@ const FILTERS: { id: HistorialFilter; label: string }[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const AVATAR_COLORS = [
+  "#2A6FDB", "#1F8A5B", "#9A4DC9", "#C97D0E",
+  "#D03A3A", "#2C6571", "#E85A26", "#6B4FBB", "#E91E8C",
+];
+
+function avatarColor(name: string): string {
+  let h = 0;
+  for (const c of name) h = ((h * 31) + c.charCodeAt(0)) | 0;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
+}
+
+function relativeTime(iso: string): string {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60)     return "hace unos segundos";
+  if (diff < 3600)   return `hace ${Math.floor(diff / 60)} min`;
+  if (diff < 86400)  return `hace ${Math.floor(diff / 3600)} h`;
+  if (diff < 172800) return "ayer";
+  return `hace ${Math.floor(diff / 86400)} días`;
+}
 
 function fmtDate(val: unknown): string {
   if (!val) return "Sin fecha";

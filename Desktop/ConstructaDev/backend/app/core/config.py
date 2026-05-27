@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # URL of the frontend app — used to build invite links
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Allowed frontend origins for CORS — comma-separated in production
+    # e.g. "https://tu-app.vercel.app,https://www.tudominio.com"
+    CORS_ORIGINS: str = ""
+
     # Internal API key for service-to-service calls (e.g. n8n scheduled jobs)
     INTERNAL_API_KEY: str = ""
 

@@ -1,7 +1,8 @@
 import { io } from "socket.io-client";
 import { getToken } from "./tokenStorage";
 
-const socket = io("http://localhost:8000", {
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:8000";
+const socket = io(SOCKET_URL, {
   auth: (cb) => {
     cb({ token: getToken() ?? "" });
   },

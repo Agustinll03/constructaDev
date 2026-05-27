@@ -24,26 +24,7 @@ export interface Obra {
 
 export type Page = "panel" | "configuracion" | "equipo" | "bitacora" | "presupuestos";
 
-export type ObraTab = "resumen" | "tareas" | "responsables" | "alertas" | "historial" | "documentos";
-
-export type DocumentCategory = "plano" | "contrato" | "certificado" | "presupuesto" | "foto" | "otro";
-export type DocumentStatus = "pendiente" | "aprobado" | "rechazado";
-
-export interface Document {
-  id: number;
-  obra_id: number;
-  task_id: number | null;
-  uploaded_by: number;
-  uploader_name: string | null;
-  category: DocumentCategory;
-  status: DocumentStatus;
-  original_name: string;
-  display_name: string | null;
-  file_url: string;
-  notes: string | null;
-  version: number;
-  created_at: string;
-}
+export type ObraTab = "resumen" | "tareas" | "responsables" | "alertas" | "historial";
 
 export interface Responsible {
   id: number;
