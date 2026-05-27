@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { fetchAlerts, markAlertRead } from "../api/alerts";
-import { fetchDocuments } from "../api/documents";
 import { fetchHistorial } from "../api/historial";
 import { fetchResponsibles } from "../api/responsibles";
 import { fetchTasksByObra, updateTaskStatus } from "../api/tasks";
 import { AlertasTab } from "../components/AlertasTab";
-import { DocumentosTab } from "../components/DocumentosTab";
 import { HistorialPanel } from "../components/HistorialPanel";
 import { ResumenTab } from "../components/ResumenTab";
 import { Spinner } from "../components/Spinner";
@@ -19,7 +17,7 @@ import { useTaskSocket } from "../hooks/useTaskSocket";
 import { useCan } from "../hooks/usePermission";
 import { useEditingSimulation } from "../hooks/useEditingSimulation";
 import { useViewingUsers } from "../hooks/useOnlineUsers";
-import type { Alert, Document, HistorialEvento, Obra, ObraStatus, ObraTab, Responsible, Task, TaskStatus } from "../types";
+import type { Alert, HistorialEvento, Obra, ObraStatus, ObraTab, Responsible, Task, TaskStatus } from "../types";
 
 // ── Visual helpers ─────────────────────────────────────────────────────────────
 
@@ -66,7 +64,6 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [historial, setHistorial] = useState<HistorialEvento[]>([]);
   const [responsibles, setResponsibles] = useState<Responsible[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,17 +76,15 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
     setError(null);
     try {
       const tasksData = await fetchTasksByObra(obra.id);
-      const [allAlerts, historialData, responsiblesData, documentsData] = await Promise.all([
+      const [allAlerts, historialData, responsiblesData] = await Promise.all([
         fetchAlerts(),
         fetchHistorial(obra.id),
         fetchResponsibles(),
-        fetchDocuments(obra.id),
       ]);
       setTasks(tasksData);
       setAlerts(allAlerts.filter((a) => a.obra_id === obra.id));
       setHistorial(historialData);
       setResponsibles(responsiblesData);
-      setDocuments(documentsData);
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
       if (status === 403) {
@@ -451,18 +446,6 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
             </div>
           </div>
         );
-
-      case "documentos":
-        return (
-          <DocumentosTab
-            obraId={obra.id}
-            tasks={tasks}
-            documents={documents}
-            onDocumentAdded={(doc) => setDocuments((prev) => [...prev, doc])}
-            onDocumentDeleted={(id) => setDocuments((prev) => prev.filter((d) => d.id !== id))}
-            onDocumentUpdated={(doc) => setDocuments((prev) => prev.map((d) => d.id === doc.id ? doc : d))}
-          />
-        );
     }
   }
 
@@ -645,7 +628,6 @@ export function ObraDetailPage({ obra, activeTab, onTabChange, onCounts }: ObraD
             {activeTab === "resumen" && can("tarea.create") && (
               <button
                 onClick={() => setShowCreateTask(true)}
-                data-cy="nueva-tarea-btn"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 7,
                   padding: "9px 14px", borderRadius: 10,

@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { Pencil, Trash2, AlertTriangle, ChevronDown, X } from "lucide-react";
 import type { Responsible, Task, TaskStatus } from "../types";
 import type { Editor } from "../hooks/useEditingSimulation";
-import { getInitials, avatarColor, fmtDateShort } from "../lib/formatUtils";
-import { isOverdue } from "../lib/taskUtils";
 
 // ─── Design tokens (mirrors GanttTimeline) ────────────────────────────────────
 
@@ -15,6 +13,36 @@ const STATUS_STYLE: Record<TaskStatus, { bg: string; border: string; dot: string
   cancelada:   { bg: "#F4F5F4", border: "#94928D", dot: "#94928D", label: "Cancelada",   stripe: "#94928D" },
 };
 
+const AVATAR_COLORS = ["#E76A2D", "#3A6BD9", "#1F9A5A", "#9A4DC9", "#D03A3A", "#E89B14", "#0EA5A0"];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const TODAY = new Date().toISOString().slice(0, 10);
+
+function fmtDate(d: string | null): string {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+}
+
+function isOverdue(task: Task): boolean {
+  return (
+    task.due_date !== null &&
+    task.due_date < TODAY &&
+    task.status !== "completada" &&
+    task.status !== "cancelada"
+  );
+}
+
+function avatarColor(name: string): string {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string): string {
+  return name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -45,7 +73,6 @@ function StatusDropdown({
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
       <button
         type="button"
-        data-cy="status-toggle"
         onClick={() => interactive && setOpen(v => !v)}
         style={{
           display: "inline-flex", alignItems: "center", gap: 5,
@@ -531,7 +558,7 @@ export function TaskTable({
                   fontWeight: overdue ? 600 : 400,
                   fontFamily: "'JetBrains Mono', monospace",
                 }}>
-                  {fmtDateShort(task.due_date)}
+                  {fmtDate(task.due_date)}
                 </span>
                 {overdue && (
                   <div style={{

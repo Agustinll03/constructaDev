@@ -4,7 +4,7 @@ import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import alerts, auth, documents, events, notifications, obras, presence, responsibles, tasks, uploads, users, webhooks
+from app.api.routes import alerts, auth, events, notifications, obras, presence, responsibles, tasks, uploads, users, webhooks
 from app.api.routes import settings as settings_router
 from app.core.config import settings
 from app.core.scheduler import start_scheduler, stop_scheduler
@@ -27,14 +27,21 @@ fastapi_app = FastAPI(
     lifespan=lifespan,
 )
 
+_default_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
+allowed_origins = (
+    [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+    if settings.CORS_ORIGINS
+    else _default_origins
+)
+
 fastapi_app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,7 +61,6 @@ fastapi_app.include_router(settings_router.router, prefix=API_PREFIX)
 fastapi_app.include_router(events.router, prefix=API_PREFIX)
 fastapi_app.include_router(uploads.router, prefix=API_PREFIX)
 fastapi_app.include_router(presence.router, prefix=API_PREFIX)
-fastapi_app.include_router(documents.router, prefix=API_PREFIX)
 
 
 # Serve uploaded images — must be a proper route (not StaticFiles) to work

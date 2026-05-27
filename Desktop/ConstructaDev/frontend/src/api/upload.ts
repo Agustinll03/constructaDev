@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BACKEND = "http://localhost:8000";
+const BACKEND = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:8000";
 
 export async function uploadImage(file: File): Promise<string> {
   const token = localStorage.getItem("access_token");

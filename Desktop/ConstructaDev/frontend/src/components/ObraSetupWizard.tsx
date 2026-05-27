@@ -283,7 +283,6 @@ function Step1({ data, onChange, errors }: { data: ObraFormData; onChange: (d: O
         <FieldLabel>Nombre de la obra</FieldLabel>
         <input style={iStyle(!!errors.name)} placeholder="Ej: Edificio Palermo III"
           value={data.name} onChange={set("name")} maxLength={255} autoFocus
-          data-cy="obra-name-input"
           onFocus={e => onFocus(e, !!errors.name)} onBlur={e => onBlur(e, !!errors.name)} />
         <FieldError msg={errors.name} />
       </div>

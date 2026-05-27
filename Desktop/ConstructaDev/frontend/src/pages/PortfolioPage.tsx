@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PlusIcon, MapPinIcon } from "@heroicons/react/24/outline";
 import { GooeyInput } from "@/components/ui/gooey-input";
-import { fetchObras, deleteObra } from "../api/obras";
+import { fetchObras } from "../api/obras";
 import { fetchMembers, type ApiUser } from "../api/users";
 import { userAvatarColor } from "../context/UserContext";
 import { Spinner } from "../components/Spinner";
@@ -53,20 +53,8 @@ function getInitials(name: string): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
 }
 
-function ObraCard({ obra, onSelect, isPinned, onTogglePin, onDelete, members }: { obra: Obra; onSelect: () => void; isPinned: boolean; onTogglePin: () => void; onDelete?: () => void; members: Map<number, ApiUser> }) {
-  const [imgError,  setImgError]  = useState(false);
-  const [menuOpen,  setMenuOpen]  = useState(false);
-  const [deleting,  setDeleting]  = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
+function ObraCard({ obra, onSelect, isPinned, onTogglePin, members }: { obra: Obra; onSelect: () => void; isPinned: boolean; onTogglePin: () => void; members: Map<number, ApiUser> }) {
+  const [imgError, setImgError] = useState(false);
   const pill      = STATUS_PILL[obra.status];
   const pct       = obra.total_tasks === 0 ? 0 : Math.round((obra.completed_tasks / obra.total_tasks) * 100);
   const barColor  = PROGRESS_COLOR[obra.status];
@@ -232,75 +220,18 @@ function ObraCard({ obra, onSelect, isPinned, onTogglePin, onDelete, members }: 
         </div>
 
         {/* Menu dots */}
-        <div ref={menuRef} style={{ position: "relative" }}>
-          <button
-            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
-            style={{
-              width: 26, height: 26, borderRadius: 7,
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              color: menuOpen ? "#FF6B35" : "#8E97A0",
-              background: menuOpen ? "#FFF1E9" : "none",
-              border: "none", cursor: "pointer",
-            }}
-            onMouseEnter={e => { if (!menuOpen) (e.currentTarget.style.background = "#F4F5F4"); }}
-            onMouseLeave={e => { if (!menuOpen) (e.currentTarget.style.background = "none"); }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <circle cx="4" cy="8" r="1.2" fill="currentColor"/>
-              <circle cx="8" cy="8" r="1.2" fill="currentColor"/>
-              <circle cx="12" cy="8" r="1.2" fill="currentColor"/>
-            </svg>
-          </button>
-
-          {menuOpen && (
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{
-                position: "absolute", bottom: "calc(100% + 6px)", right: 0, zIndex: 200,
-                background: "#fff",
-                border: "1px solid #E6E7E5",
-                borderRadius: 10,
-                boxShadow: "0 8px 24px -4px rgba(15,22,28,0.14)",
-                padding: 4,
-                minWidth: 148,
-              }}
-            >
-              {onDelete && (
-                <button
-                  disabled={deleting}
-                  onClick={async e => {
-                    e.stopPropagation();
-                    setDeleting(true);
-                    try {
-                      await deleteObra(obra.id);
-                      onDelete();
-                    } finally {
-                      setDeleting(false);
-                      setMenuOpen(false);
-                    }
-                  }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    width: "100%", padding: "7px 10px", borderRadius: 7,
-                    fontSize: 13, fontWeight: 500,
-                    color: deleting ? "#ADAAA4" : "#D03A3A",
-                    background: "transparent", border: "none",
-                    cursor: deleting ? "not-allowed" : "pointer",
-                    textAlign: "left",
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  }}
-                  onMouseEnter={e => { if (!deleting) (e.currentTarget as HTMLElement).style.background = "#FCE5E5"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                    <path d="M2.5 4.5h11M6 4.5V3h4v1.5M6.5 7v5M9.5 7v5M3.5 4.5l1 9h7l1-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  {deleting ? "Borrando..." : "Borrar obra"}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        <button
+          onClick={e => e.stopPropagation()}
+          style={{ width: 26, height: 26, borderRadius: 7, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#8E97A0", background: "none", border: "none", cursor: "pointer" }}
+          onMouseEnter={e => (e.currentTarget.style.background = "#F4F5F4")}
+          onMouseLeave={e => (e.currentTarget.style.background = "none")}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="4" cy="8" r="1.2" fill="currentColor"/>
+            <circle cx="8" cy="8" r="1.2" fill="currentColor"/>
+            <circle cx="12" cy="8" r="1.2" fill="currentColor"/>
+          </svg>
+        </button>
       </div>
     </article>
   );
@@ -364,7 +295,6 @@ interface PortfolioPageProps {
 
 export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePin }: PortfolioPageProps) {
   const canCreateObra = usePermission("obra.create");
-  const canDeleteObra = usePermission("obra.delete");
   const [obras,      setObras]      = useState<Obra[]>([]);
   const [members,    setMembers]    = useState<Map<number, ApiUser>>(new Map());
   const [loading,    setLoading]    = useState(true);
@@ -442,7 +372,6 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
           {canCreateObra && (
             <button
               onClick={onNewObra}
-              data-cy="nueva-obra-btn"
               style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10, background: "#FF6B35", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 1px 0 rgba(255,255,255,0.18) inset, 0 6px 14px -6px rgba(255,107,53,0.55)" }}
               onMouseEnter={e => (e.currentTarget.style.background = "#E85A26")}
               onMouseLeave={e => (e.currentTarget.style.background = "#FF6B35")}
@@ -587,7 +516,6 @@ export function PortfolioPage({ onSelectObra, onNewObra, pinnedObras, onTogglePi
                       onSelect={() => onSelectObra(obra)}
                       isPinned={pinnedIds.has(obra.id)}
                       onTogglePin={() => onTogglePin(obra)}
-                      onDelete={canDeleteObra ? () => setObras(prev => prev.filter(o => o.id !== obra.id)) : undefined}
                       members={members}
                     />
                   ))}

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { CheckCheck, ArrowRight } from "lucide-react";
 import type { Alert, AlertType, Task } from "../types";
-import { getAlertLabel } from "../lib/alertUtils";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -22,6 +21,20 @@ const TYPE_STYLE: Record<AlertType, { bar: string; bg: string; color: string; bo
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function getAlertLabel(alert: Alert): string {
+  switch (alert.type) {
+    case "task_blocked":  return "Tarea bloqueada";
+    case "task_overdue":  return "Tarea vencida";
+    case "no_response":   return "Sin respuesta";
+    default: {
+      const msg = alert.message.toLowerCase();
+      if (msg.includes("responsable")) return "Sin responsable";
+      if (msg.includes("vencida"))     return "Tarea vencida";
+      if (msg.includes("avance"))      return "Avance inconsistente";
+      return "Riesgo de demora";
+    }
+  }
+}
 
 function getTypeStyle(alert: Alert) {
   const base = TYPE_STYLE[alert.type];
@@ -198,8 +211,6 @@ export function AlertasTab({ alerts, tasks, onMarkRead, onMarkAllRead, onViewTas
             return (
               <li
                 key={alert.id}
-                data-cy="alerta-item"
-                data-unread={!isRead ? "true" : undefined}
                 style={{
                   display: "flex", alignItems: "stretch",
                   borderBottom: idx < filtered.length - 1 ? "1px solid #F2F0EC" : "none",
@@ -268,7 +279,6 @@ export function AlertasTab({ alerts, tasks, onMarkRead, onMarkAllRead, onViewTas
                       <button
                         onClick={() => onMarkRead(alert.id)}
                         title="Marcar como leída"
-                        data-cy="marcar-leida-btn"
                         style={{
                           width: 30, height: 30, borderRadius: 8, border: "none",
                           background: "transparent", cursor: "pointer",
