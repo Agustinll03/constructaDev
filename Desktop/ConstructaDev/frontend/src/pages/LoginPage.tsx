@@ -45,7 +45,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         {/* Video de fondo */}
         <video
           className="absolute inset-0 w-full h-full object-cover"
-          src="/hero-video.mp4"
+          src="https://res.cloudinary.com/dwnb4sipt/video/upload/hero-video_online-video-cutter.com_1_eylphf.mp4"
           autoPlay
           muted
           loop
