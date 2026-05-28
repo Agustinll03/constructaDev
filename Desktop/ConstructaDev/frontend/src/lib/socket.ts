@@ -13,7 +13,7 @@ const socket = io(SOCKET_URL, {
   reconnectionDelayMax: 10_000,
   // Start with polling (always works), then upgrade to websocket.
   // Reversing the order causes the first attempt to fail and adds a 1s reconnect delay.
-  transports: ["polling", "websocket"],
+  transports: ["polling"],
 });
 
 
