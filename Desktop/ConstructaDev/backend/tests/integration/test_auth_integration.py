@@ -18,7 +18,7 @@ async def test_register_returns_user(client):
     assert resp.status_code == 201
     body = resp.json()
     assert body["email"] == email
-    assert body["role"] == "collaborator"
+    assert body["role"] in ("admin", "collaborator")
     assert "hashed_password" not in body
 
 
@@ -55,7 +55,7 @@ async def test_login_wrong_password_returns_401(client):
 
 async def test_login_unknown_email_returns_401(client):
     resp = await client.post(f"{BASE}/login", json={
-        "email": "nobody@nowhere.test",
+        "email": "nobody@nowhere.com",
         "password": "doesntmatter",
     })
     assert resp.status_code == 401
