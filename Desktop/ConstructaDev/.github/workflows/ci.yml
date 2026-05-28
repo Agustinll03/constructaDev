@@ -1,4 +1,4 @@
-name: CI
+name: CI / CD
 
 on:
   push:
@@ -7,7 +7,33 @@ on:
     branches: [master]
 
 jobs:
-  frontend:
+  # ── 1. Tests unitarios backend ─────────────────────────────────────────────
+  test-backend:
+    name: Backend — unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Desktop/ConstructaDev/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: Desktop/ConstructaDev/backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: pytest tests/unit/ -v --tb=short
+        env:
+          SECRET_KEY: ci-secret-not-real-32-chars-padded
+          DATABASE_URL: postgresql+asyncpg://user:pass@localhost/db
+
+  # ── 2. Build frontend ──────────────────────────────────────────────────────
+  build-frontend:
     name: Frontend — build check
     runs-on: ubuntu-latest
     defaults:
@@ -28,26 +54,15 @@ jobs:
       - name: Build
         run: npm run build
 
-  backend:
-    name: Backend — import check
+  # ── 3. Deploy (solo en push a master, si los dos jobs anteriores pasan) ───
+  deploy:
+    name: Deploy to Render
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: Desktop/ConstructaDev/backend
+    needs: [test-backend, build-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
-      - uses: actions/checkout@v4
+      - name: Deploy backend
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}"
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: Desktop/ConstructaDev/backend/requirements.txt
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Check imports
-        run: python -c "from app.main import app; print('OK')"
-        env:
-          SECRET_KEY: ci-secret-key-not-real
-          DATABASE_URL: postgresql+asyncpg://user:pass@localhost/db
+      - name: Deploy frontend
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}"
