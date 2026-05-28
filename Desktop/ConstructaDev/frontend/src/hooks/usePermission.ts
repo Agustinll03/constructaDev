@@ -14,7 +14,7 @@ export type Permission =
   | "configuracion.edit"
   | "documentos.upload";
 
-const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: [
     "obra.create", "obra.edit", "obra.delete",
     "tarea.create", "tarea.edit", "tarea.delete", "tarea.move",
