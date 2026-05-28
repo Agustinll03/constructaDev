@@ -207,9 +207,9 @@ const STATUS_COLORS: Record<StatusLevel, { border: string; iconBg: string; iconC
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ["#FF6B35", "#2A6FDB", "#1F8A5B", "#9A4DC9", "#C97D0E", "#D03A3A", "#2C6571"];
+const _AVATAR_COLORS = ["#FF6B35", "#2A6FDB", "#1F8A5B", "#9A4DC9", "#C97D0E", "#D03A3A", "#2C6571"];
 
-function getInitials(name: string) {
+function _getInitials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
 }
 
