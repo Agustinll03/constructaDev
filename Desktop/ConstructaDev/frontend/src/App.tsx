@@ -167,7 +167,7 @@ function App() {
 
       {showWizard && (
         <ObraSetupWizard
-          onClose={() => setShowWizard(false)}
+          onClose={() => { setShowWizard(false); setPortfolioKey(k => k + 1); }}
           onCreated={handleObraCreated}
         />
       )}
