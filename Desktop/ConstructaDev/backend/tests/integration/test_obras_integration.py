@@ -6,7 +6,7 @@ BASE_OBRAS = "/api/v1/obras"
 
 
 def _unique_email() -> str:
-    return f"obras_{uuid.uuid4().hex[:8]}@integration.test"
+    return f"obras_{uuid.uuid4().hex[:8]}@example.com"
 
 
 async def _register_and_login(client) -> str:

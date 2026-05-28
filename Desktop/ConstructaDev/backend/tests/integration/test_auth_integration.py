@@ -5,7 +5,7 @@ BASE = "/api/v1/auth"
 
 
 def _unique_email() -> str:
-    return f"test_{uuid.uuid4().hex[:8]}@integration.test"
+    return f"test_{uuid.uuid4().hex[:8]}@example.com"
 
 
 async def test_register_returns_user(client):
