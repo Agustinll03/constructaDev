@@ -31,6 +31,7 @@ function App() {
   const [activeTab, setActiveTab]       = useState<ObraTab>("resumen");
   const [obraCounts, setObraCounts]     = useState({ tasks: 0, alerts: 0, responsibles: 0 });
   const [showWizard, setShowWizard]     = useState(false);
+  const [portfolioKey, setPortfolioKey] = useState(0);
   const [pinnedObras, setPinnedObras]   = useState<Obra[]>(() => {
     try { return JSON.parse(localStorage.getItem("pinned_obras") || "[]"); }
     catch { return []; }
@@ -86,6 +87,7 @@ function App() {
 
   function handleObraCreated(obra: Obra) {
     setShowWizard(false);
+    setPortfolioKey(k => k + 1);
     setSelectedObra(obra);
     setActivePage("panel");
   }
@@ -131,6 +133,7 @@ function App() {
         <ObraDetailPage obra={selectedObra} activeTab={activeTab} onTabChange={handleTabChange} onCounts={handleObraCounts} />
       ) : (
         <PortfolioPage
+          key={portfolioKey}
           onSelectObra={handleSelectObra}
           onNewObra={() => setShowWizard(true)}
           pinnedObras={pinnedObras}
