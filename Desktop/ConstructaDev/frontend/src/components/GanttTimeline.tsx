@@ -601,28 +601,6 @@ export function GanttTimeline({
                 );
               })}
             </div>
-            {/* Filter */}
-            <button title="Filtrar" style={{ width: 28, height: 28, borderRadius: 6, background: "#fff", border: "1px solid #ECE7DD", display: "flex", alignItems: "center", justifyContent: "center", color: "#3A3936", cursor: "pointer" }}>
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-            {/* Go to today */}
-            <button
-              title="Ir a hoy"
-              onClick={() => {
-                if (!scrollRef.current) return;
-                const currentDayW = dayWRef.current;
-                const todayCol = (-rangeStart) * currentDayW;
-                scrollRef.current.scrollTo({ left: Math.max(0, todayCol - scrollRef.current.clientWidth / 3), behavior: "smooth" });
-              }}
-              style={{ width: 28, height: 28, borderRadius: 6, background: "#fff", border: "1px solid #ECE7DD", display: "flex", alignItems: "center", justifyContent: "center", color: "#3A3936", cursor: "pointer" }}
-            >
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="2" fill="#E76A2D"/>
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/>
-              </svg>
-            </button>
           </div>
         </div>
 

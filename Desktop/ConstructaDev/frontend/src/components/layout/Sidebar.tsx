@@ -6,10 +6,6 @@ import {
   BellIcon,
   ClockIcon,
   UsersIcon,
-  Cog6ToothIcon,
-  ChatBubbleLeftEllipsisIcon,
-  DocumentTextIcon,
-  ChevronDownIcon,
   ArrowRightStartOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import type { Obra, ObraStatus, ObraTab, Page } from "../../types";
@@ -137,18 +133,14 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
         </div>
       </div>
 
-      {/* ── Workspace switcher ── */}
+      {/* ── Workspace name ── */}
       <div style={{
         display: "flex", alignItems: "center", gap: 9,
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.07)",
         borderRadius: 10, padding: "8px 10px",
-        margin: "0 2px 14px", cursor: "pointer",
-        transition: "background 0.15s",
-      }}
-        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
-        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
-      >
+        margin: "0 2px 14px",
+      }}>
         <div style={{
           width: 24, height: 24, borderRadius: 6, flexShrink: 0,
           background: "linear-gradient(135deg, #FF8856, #FF6B35)",
@@ -156,11 +148,9 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
           display: "flex", alignItems: "center", justifyContent: "center",
           fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}>EV</div>
-        <div style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-          <div style={{ color: "#fff", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Estudio Velar</div>
-          <div style={{ fontSize: 10.5, color: "#8C969C", letterSpacing: "0.04em" }}>Workspace</div>
+        <div style={{ color: "#fff", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          Estudio Velar
         </div>
-        <ChevronDownIcon style={{ width: 12, height: 12, color: "#6B767E", flexShrink: 0 }} />
       </div>
 
       {/* ── WORKSPACE section ── */}
@@ -248,61 +238,7 @@ export function Sidebar({ activePage, onNavigate, onLogout, pinnedObras = [], se
         />
       </nav>
 
-      {/* ── CUENTA section ── */}
-      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
-        Cuenta
-      </div>
-      <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <NavItem
-          label="Configuración"
-          active={activePage === "configuracion"}
-          onClick={() => onNavigate("configuracion")}
-          icon={<Cog6ToothIcon style={ICON_SIZE} />}
-        />
-      </nav>
 
-      {/* ── PRÓXIMAMENTE section — solo con obra seleccionada ── */}
-      {selectedObra && (
-        <>
-          <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: "#6B767E", textTransform: "uppercase", padding: "14px 10px 6px" }}>
-            Próximamente
-          </div>
-          <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            {(["bitacora", "presupuestos"] as const).map((page) => {
-              const meta = {
-                bitacora:     { label: "Bitácora de Obra", icon: <ChatBubbleLeftEllipsisIcon style={ICON_SIZE} /> },
-                presupuestos: { label: "Presupuestos",     icon: <DocumentTextIcon style={ICON_SIZE} /> },
-              }[page];
-              const isActive = activePage === page;
-              return (
-                <button
-                  key={page}
-                  onClick={() => onNavigate(page)}
-                  style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 11,
-                    padding: "7px 10px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-                    textAlign: "left", cursor: "pointer", border: "none",
-                    transition: "background 0.12s",
-                    background: isActive ? "linear-gradient(180deg, rgba(255,107,53,0.18), rgba(255,107,53,0.08))" : "transparent",
-                    boxShadow: isActive ? "inset 0 0 0 1px rgba(255,107,53,0.25)" : "none",
-                    color: isActive ? "#fff" : "#CFD4D7",
-                  }}
-                  onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
-                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >
-                  <span style={{ width: 16, display: "inline-flex", justifyContent: "center", color: isActive ? "#FF6B35" : "inherit", opacity: isActive ? 1 : 0.65, flexShrink: 0 }}>
-                    {meta.icon}
-                  </span>
-                  <span style={{ flex: 1 }}>{meta.label}</span>
-                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 99, background: "rgba(255,107,53,0.18)", color: "#FF6B35", letterSpacing: "0.04em", flexShrink: 0 }}>
-                    PRONTO
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-        </>
-      )}
 
       {/* ── Spacer ── */}
       <div style={{ flex: 1 }} />
