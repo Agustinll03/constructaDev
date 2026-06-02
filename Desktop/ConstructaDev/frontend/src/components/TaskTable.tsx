@@ -56,6 +56,7 @@ function StatusDropdown({
   onStatusChange?: (task: Task, newStatus: TaskStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
   const { bg, border, dot, label } = STATUS_STYLE[task.status];
   const interactive = !!onStatusChange;
@@ -73,7 +74,12 @@ function StatusDropdown({
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
       <button
         type="button"
-        onClick={() => interactive && setOpen(v => !v)}
+        onClick={(e) => {
+          if (!interactive) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          setDropPos({ top: rect.bottom + 6, left: rect.left });
+          setOpen(v => !v);
+        }}
         style={{
           display: "inline-flex", alignItems: "center", gap: 5,
           padding: "3px 7px 3px 7px", borderRadius: 99,
@@ -93,7 +99,7 @@ function StatusDropdown({
 
       {open && (
         <div style={{
-          position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 100,
+          position: "fixed", top: dropPos.top, left: dropPos.left, zIndex: 9999,
           background: "#fff",
           border: "1px solid #E6E7E5",
           borderRadius: 10,
@@ -479,8 +485,8 @@ export function TaskTable({
               style={{
                 display: "grid",
                 gridTemplateColumns: hasActions
-                  ? "1fr 140px 120px 170px 110px 80px"
-                  : "1fr 140px 120px 170px 110px",
+                  ? "1fr 140px 170px 110px 80px"
+                  : "1fr 140px 170px 110px",
                 alignItems: "center",
                 padding: "0 0 0 20px",
                 minHeight: 64,
